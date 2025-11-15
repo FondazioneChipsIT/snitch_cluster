@@ -1270,40 +1270,36 @@ module snitch_cluster
     cluster_xbar_default_port;
   xbar_rule_t [NrRules-1:0] cluster_xbar_rules;
 
-  assign cluster_xbar_rules [NrRuleIdcs-1:0] = '{
-    '{
-      idx:        TCDM,
-      start_addr: tcdm_start_address,
-      end_addr:   tcdm_end_address
-    },
-    '{
-      idx:        ClusterPeripherals,
-      start_addr: cluster_periph_start_address,
-      end_addr:   cluster_periph_end_address
-    },
-    '{
-      idx:        ExtSlave,
-      start_addr: ext_mem_start_address,
-      end_addr:   ext_mem_end_address
-    }
+  assign cluster_xbar_rules [2] = '{
+    idx:        TCDM,
+    start_addr: tcdm_start_address,
+    end_addr:   tcdm_end_address
+  };
+  assign cluster_xbar_rules [1] = '{
+    idx:        ClusterPeripherals,
+    start_addr: cluster_periph_start_address,
+    end_addr:   cluster_periph_end_address
+  };
+  assign cluster_xbar_rules [0] = '{
+    idx:        ExtSlave,
+    start_addr: ext_mem_start_address,
+    end_addr:   ext_mem_end_address
   };
   if (AliasRegionEnable) begin : gen_cluster_xbar_alias
-    assign cluster_xbar_rules [NrRules-1:NrRuleIdcs] = '{
-      '{
-        idx:        TCDM,
-        start_addr: TCDMAliasStart,
-        end_addr:   TCDMAliasEnd
-      },
-      '{
-        idx:        ClusterPeripherals,
-        start_addr: PeriphAliasStart,
-        end_addr:   PeriphAliasEnd
-      },
-      '{
-        idx:        ExtSlave,
-        start_addr: ExtAliasStart,
-        end_addr:   ExtAliasEnd
-      }
+    assign cluster_xbar_rules [5] = '{
+      idx:        TCDM,
+      start_addr: TCDMAliasStart,
+      end_addr:   TCDMAliasEnd
+    };
+    assign cluster_xbar_rules [4] = '{
+      idx:        ClusterPeripherals,
+      start_addr: PeriphAliasStart,
+      end_addr:   PeriphAliasEnd
+    };
+    assign cluster_xbar_rules [3] = '{
+      idx:        ExtSlave,
+      start_addr: ExtAliasStart,
+      end_addr:   ExtAliasEnd
     };
   end
 
