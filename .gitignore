@@ -32,4 +32,4 @@ gmon.out
 my_env/
 logs/
 .dasm
-
+dma_trace_00008_00000.log
