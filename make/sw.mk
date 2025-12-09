@@ -100,6 +100,32 @@ SN_APPS += $(SN_ROOT)/sw/kernels/misc/log
 SN_APPS += $(SN_ROOT)/sw/kernels/misc/kbpcpa
 SN_APPS += $(SN_ROOT)/sw/kernels/misc/box3d1r
 SN_APPS += $(SN_ROOT)/sw/kernels/misc/j3d27pt
+# Tests of functions #
+SN_APPS += $(SN_ROOT)/sw/a_Tests/aaa_Test_SSR
+SN_APPS += $(SN_ROOT)/sw/a_Tests/aab_Test_division
+SN_APPS += $(SN_ROOT)/sw/a_Tests/ssr_overhead
+# Codes added to implement the PLAY repository #
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/hello
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/vector_axpy
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/vector_add
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/vector_sub
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/vector_dot
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/vector_mul
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/vector_scale
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/vector_offset
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/vector_min
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/vector_memcpy
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/vector_set_all
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/matrix_set_all
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/matrix_memcpy
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/matrix_mul
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/matrix_swap_rows
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/matrix_trans
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/linalg_gemv
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/matrix_mul_trans_A
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/matrix_mul_trans_B
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/linalg_lu_decomp
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/linalg_lu_solve
 endif
 
 # Include Makefile from each app subdirectory

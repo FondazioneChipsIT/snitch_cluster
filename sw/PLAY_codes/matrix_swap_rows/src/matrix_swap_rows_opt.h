@@ -1,0 +1,102 @@
+// Luca Colombo Chips-IT 2025
+
+void matrix_swap_rows_opt(uint32_t chunk_per_core, uint32_t offset, 
+                        uint64_t *start_cycle, uint64_t *end_cycle, 
+                        double *mat_a, double *row_a, double *row_b,
+                        uint32_t indx_a, uint32_t indx_b){
+
+    double zero = 0.0;
+
+    // Load zero in ft4
+    asm volatile(
+        "fld ft4, 0(%[zero])\n"
+        :                   // Outputs
+        : [zero] "r"(zero)   // Inputs 
+        : "ft3");           // Clobber list
+
+    *start_cycle = snrt_mcycle();
+
+    // Setup the 1d loop with ssr (tell which streams to use, the size and the size of
+    // the elements)
+    snrt_ssr_loop_1d(SNRT_SSR_DM0, chunk_per_core, sizeof(double));
+    snrt_ssr_loop_1d(SNRT_SSR_DM1, chunk_per_core, sizeof(double));
+    // Write to ft0
+    snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, mat_a + indx_a*col + offset); //ft0<-mat_a
+    snrt_ssr_write(SNRT_SSR_DM1, SNRT_SSR_1D, row_a + offset); //ft1->row_a
+
+    snrt_ssr_enable();
+    // Assembly code to add ft3 (val) to ft4 (0) and store in ft1 (vec)
+    asm volatile(
+        "frep.o %[n_frep], 1, 0, 0 \n"
+        "fadd.d ft1, ft0, ft4\n"
+        :
+        : [ n_frep ] "r"(chunk_per_core - 1)
+        : "ft0", "ft3", "ft4", "memory");
+
+    // Disable SSRs
+    snrt_ssr_disable();
+
+    snrt_ssr_loop_1d(SNRT_SSR_DM0, chunk_per_core, sizeof(double));
+    snrt_ssr_loop_1d(SNRT_SSR_DM1, chunk_per_core, sizeof(double));
+    // Write to ft0
+    snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, mat_a + indx_b*col + offset); //ft0<-mat_a
+    snrt_ssr_write(SNRT_SSR_DM1, SNRT_SSR_1D, row_b + offset); //ft1->row_a
+    
+    snrt_ssr_enable();
+     // Assembly code to add ft3 (val) to ft4 (0) and store in ft1 (vec)
+    asm volatile(
+        "frep.o %[n_frep], 1, 0, 0 \n"
+        "fadd.d ft1, ft0, ft4\n"
+        :
+        : [ n_frep ] "r"(chunk_per_core - 1)
+        : "ft0", "ft3", "ft4", "memory");
+
+    // Disable SSRs
+    snrt_ssr_disable();
+
+
+    snrt_ssr_loop_1d(SNRT_SSR_DM0, chunk_per_core, sizeof(double));
+    snrt_ssr_loop_1d(SNRT_SSR_DM1, chunk_per_core, sizeof(double));
+    // Write to ft0
+    snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, row_a + offset); //ft0<-row_a
+    snrt_ssr_write(SNRT_SSR_DM1, SNRT_SSR_1D, mat_a + indx_b*col + offset); //ft1->mat_a
+    
+    snrt_ssr_enable();
+     // Assembly code to add ft3 (val) to ft4 (0) and store in ft1 (vec)
+    asm volatile(
+        "frep.o %[n_frep], 1, 0, 0 \n"
+        "fadd.d ft1, ft0, ft4\n"
+        :
+        : [ n_frep ] "r"(chunk_per_core - 1)
+        : "ft0", "ft3", "ft4", "memory");
+
+    // Disable SSRs
+    snrt_ssr_disable();
+
+
+    snrt_ssr_loop_1d(SNRT_SSR_DM0, chunk_per_core, sizeof(double));
+    snrt_ssr_loop_1d(SNRT_SSR_DM1, chunk_per_core, sizeof(double));
+    // Write to ft0
+    snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, row_b + offset); //ft0<-row_b
+    snrt_ssr_write(SNRT_SSR_DM1, SNRT_SSR_1D, mat_a + indx_a*col + offset); //ft1->mat_a
+    
+    snrt_ssr_enable();
+     // Assembly code to add ft3 (val) to ft4 (0) and store in ft1 (vec)
+    asm volatile(
+        "frep.o %[n_frep], 1, 0, 0 \n"
+        "fadd.d ft1, ft0, ft4\n"
+        :
+        : [ n_frep ] "r"(chunk_per_core - 1)
+        : "ft0", "ft3", "ft4", "memory");
+
+    // Disable SSRs
+    snrt_ssr_disable();
+
+
+    // Fence for FPU syncronization
+    snrt_fpu_fence();
+
+    *end_cycle = snrt_mcycle();
+
+    return;
+}

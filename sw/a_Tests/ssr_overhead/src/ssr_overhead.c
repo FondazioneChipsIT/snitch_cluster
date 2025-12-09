@@ -1,0 +1,41 @@
+#include "snrt.h"
+
+double *test_pointer;
+
+
+int main() {
+
+    uint32_t core_idx = snrt_cluster_core_idx();
+
+    if(core_idx == 0) {
+        uint64_t start = snrt_mcycle();
+
+
+        // 3 SSR overheads
+        //snrt_ssr_loop_1d(SNRT_SSR_DM0, 64, sizeof(double));
+        //snrt_ssr_loop_1d(SNRT_SSR_DM1, 64, sizeof(double));
+        //snrt_ssr_loop_1d(SNRT_SSR_DM2, 64, sizeof(double));
+
+        // read the matrix, use a buffer to store results
+        snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, test_pointer);
+        //snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, test_pointer); 
+        snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, test_pointer); 
+        
+        //snrt_ssr_enable();
+
+
+        //snrt_ssr_disable();
+        snrt_fpu_fence();
+
+        uint64_t end = snrt_mcycle();
+
+        uint64_t cycles = end - start;
+
+        printf("SSR Overhead Cycles: %llu\n", cycles);
+    }
+    snrt_cluster_hw_barrier();
+    return 0;
+}
+
+
+
