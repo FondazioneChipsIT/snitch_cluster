@@ -2,8 +2,9 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 # How to use CHIPS-IT without dockers
-To use this, before following the GETTING STARTED documentation, execute these commands:
+To use this, before following the GETTING STARTED documentation, execute this command:
 - `source iis-setup.sh`
+
 Install all the dependencies required in the pyproject.toml file, either locally or in a virtual environment if you are on a server.
 Then load the modules Bender and QuestaSim (or Verilator).
 After these steps follow the base tutorial [documentation pages](https://pulp-platform.github.io/snitch_cluster/ug/tutorial.html) from "Building the hardware".
