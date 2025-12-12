@@ -1,6 +1,14 @@
 ![CI](https://github.com/pulp-platform/snitch_cluster/actions/workflows/ci.yml/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
+# How to use CHIPS-IT without dockers
+To use this, before following the GETTING STARTED documentation, execute these commands:
+- `source iis-setup.sh`
+Install all the dependencies required in the pyproject.toml file, either locally or in a virtual environment if you are on a server.
+Then load the modules Bender and QuestaSim (or Verilator).
+After these steps follow the base tutorial [documentation pages](https://pulp-platform.github.io/snitch_cluster/ug/tutorial.html) from "Building the hardware".
+You should get 0 errors, if you get some check all the dependencies. GLHF -Luca
+
 # Snitch Cluster
 
 This repository hosts the hardware and software for the Snitch cluster and its generator. Snitch is a high-efficiency compute cluster platform focused on floating-point workloads. It is developed as part of the PULP project, a joint effort between ETH Zurich and the University of Bologna.

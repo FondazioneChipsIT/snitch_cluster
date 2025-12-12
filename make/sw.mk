@@ -126,6 +126,15 @@ SN_APPS += $(SN_ROOT)/sw/PLAY_codes/matrix_mul_trans_A
 SN_APPS += $(SN_ROOT)/sw/PLAY_codes/matrix_mul_trans_B
 SN_APPS += $(SN_ROOT)/sw/PLAY_codes/linalg_lu_decomp
 SN_APPS += $(SN_ROOT)/sw/PLAY_codes/linalg_lu_solve
+#DSP 
+SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/kmeans_b
+SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/exp_b
+# LLM
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/attention_b
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/gelu_b
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/layernorm_b
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/softmax_b
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/matmul_fp64
 endif
 
 # Include Makefile from each app subdirectory
