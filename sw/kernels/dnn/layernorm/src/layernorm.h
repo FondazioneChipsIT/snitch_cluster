@@ -49,7 +49,7 @@ typedef struct layernorm_layer_struct {
 static inline void layernorm_layer(layernorm_layer_t l) {
     uint32_t data_type_size = l.dtype;
 
-    snrt_mcycle();
+    
 
     // Compute the tiling parameters
     uint32_t n_tiles = l.n_tiles;
@@ -71,7 +71,7 @@ static inline void layernorm_layer(layernorm_layer_t l) {
     remote_ofmap = (char *)l.ofmap;
 
     // Iterate tiles
-    snrt_mcycle();
+    
     for (uint32_t cluster_tile_idx = 0; cluster_tile_idx < n_tiles_per_cluster;
          cluster_tile_idx++) {
         // Calculate absolute tile index
@@ -89,7 +89,7 @@ static inline void layernorm_layer(layernorm_layer_t l) {
                 l.batch_size                                  /* repetitions */
             );
             snrt_dma_wait_all();
-            snrt_mcycle();
+            
         }
 
         snrt_cluster_hw_barrier();
@@ -147,7 +147,7 @@ static inline void layernorm_layer(layernorm_layer_t l) {
 
         // DMA transfer the ofmap to DRAM
         if (snrt_is_dm_core()) {
-            snrt_mcycle();
+            
             void *remote_otile = remote_ofmap + tile_idx * tile_offset;
             snrt_dma_txid_t txid_ofmap = snrt_dma_start_2d(
                 remote_otile,                                 /* dst */
@@ -158,7 +158,7 @@ static inline void layernorm_layer(layernorm_layer_t l) {
                 l.batch_size                                  /* repetitions */
             );
             snrt_dma_wait_all();
-            snrt_mcycle();
+            
         }
     }
 

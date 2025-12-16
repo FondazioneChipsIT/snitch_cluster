@@ -64,11 +64,11 @@ static inline void kmeans_iteration(uint32_t n_samples_per_core,
         }
     }
 
-    snrt_mcycle();
+    
 
     // snrt_global_barrier();
 
-    snrt_mcycle();
+    
 
     if (snrt_is_compute_core()) {
         // Update step
@@ -93,11 +93,11 @@ static inline void kmeans_iteration(uint32_t n_samples_per_core,
         }
     }
 
-    snrt_mcycle();
+    
 
     snrt_cluster_hw_barrier();
 
-    snrt_mcycle();
+    
 
     if (snrt_is_compute_core()) {
         if (snrt_cluster_core_idx() == 0) {
@@ -129,13 +129,13 @@ static inline void kmeans_iteration(uint32_t n_samples_per_core,
                 }
             }
 
-            snrt_mcycle();
+            
 
 #if !defined(KMEANS_REDUCTION_ON_HOST)
             snrt_inter_cluster_barrier();
 
             if (snrt_cluster_idx() == 0) {
-                snrt_mcycle();
+                
 
                 // Inter-cluster reduction
                 for (uint32_t cluster_idx = 1; cluster_idx < snrt_cluster_num();
@@ -164,7 +164,7 @@ static inline void kmeans_iteration(uint32_t n_samples_per_core,
                     }
                 }
 
-                snrt_mcycle();
+                
 
                 // Normalize
                 for (uint32_t centroid_idx = 0; centroid_idx < n_clusters;
@@ -178,14 +178,15 @@ static inline void kmeans_iteration(uint32_t n_samples_per_core,
                 }
             }
 
-            snrt_mcycle();
+           
 #endif
         }
     }
+    snrt_mcycle();
 }
 
 void kmeans_job(kmeans_args_t* args) {
-    snrt_mcycle();
+    
 
     // Aliases
     uint32_t n_samples = args->n_samples;
@@ -218,7 +219,7 @@ void kmeans_job(kmeans_args_t* args) {
     final_centroids =
         (double*)snrt_remote_l1_ptr(final_centroids, snrt_cluster_idx(), 0);
 
-    snrt_mcycle();
+    
 
     // Transfer samples and initial centroids with DMA
     size_t size;
@@ -235,7 +236,7 @@ void kmeans_job(kmeans_args_t* args) {
 
     snrt_cluster_hw_barrier();
 
-    snrt_mcycle();
+    
 
     // Iterations of Lloyd's K-means algorithm
     for (uint32_t iter_idx = 0; iter_idx < n_iter; iter_idx++) {
@@ -244,7 +245,7 @@ void kmeans_job(kmeans_args_t* args) {
                          local_centroids, partial_centroids);
         snrt_global_barrier();
         local_centroids = final_centroids;
-        snrt_mcycle();
+        
     }
 
     // Transfer final centroids with DMA

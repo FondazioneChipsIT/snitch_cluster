@@ -8,6 +8,6 @@
     d: 16,
     B_r: 16,
     B_c: 16,
-    dtype: "FP16",
+    dtype: "FP32",
     baseline: true
 }

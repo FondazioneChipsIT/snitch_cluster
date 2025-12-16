@@ -82,7 +82,7 @@ static inline void flashattention_2_fp32(flashattention_2_layer_t layer) {
     float shifted_exp;
     float row_sum;
 
-    snrt_mcycle();
+    
 
     // Iterate row blocks of Q
     for (int t_r = 0; t_r < T_r; t_r++) {
@@ -101,7 +101,7 @@ static inline void flashattention_2_fp32(flashattention_2_layer_t layer) {
         }
         snrt_cluster_hw_barrier();
 
-        snrt_mcycle();
+        
 
         // Initialize m_i, m_i_prev, l_i, row_sum.
         // Distribute rows evenly to the cores in a cluster.
@@ -122,7 +122,7 @@ static inline void flashattention_2_fp32(flashattention_2_layer_t layer) {
 
         snrt_cluster_hw_barrier();
 
-        snrt_mcycle();
+        
 
         // Iterate column blocks of K (corresponding to row blocks of V)
         for (int t_c = 0; t_c < T_c; t_c++) {
@@ -171,7 +171,7 @@ static inline void flashattention_2_fp32(flashattention_2_layer_t layer) {
 
                 snrt_cluster_hw_barrier();
 
-                snrt_mcycle();
+                
 
                 // Iterate over the rows of the S row block, distributing
                 // the rows to the cores
@@ -215,7 +215,7 @@ static inline void flashattention_2_fp32(flashattention_2_layer_t layer) {
 
                 snrt_cluster_hw_barrier();
 
-                snrt_mcycle();
+                
 
                 // Calculate O tile (O_ij) of size (B_r, d).
                 // The P tile is of size (B_r, B_c) and V of size (B_c, d)
@@ -270,12 +270,11 @@ static inline void flashattention_2_fp32(flashattention_2_layer_t layer) {
             } else {
                 snrt_cluster_hw_barrier();
                 snrt_cluster_hw_barrier();
-                snrt_mcycle();
-                snrt_mcycle();
+
             }
             snrt_cluster_hw_barrier();
 
-            snrt_mcycle();
+            
         }  // end of T_c loop
 
         // Rescaling for last t_c iteration
@@ -307,7 +306,7 @@ static inline void flashattention_2_fp32(flashattention_2_layer_t layer) {
         }
         snrt_cluster_hw_barrier();
 
-        snrt_mcycle();
+        
 
     }  // end of T_r loop
 
