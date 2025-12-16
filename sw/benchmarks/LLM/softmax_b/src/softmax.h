@@ -43,6 +43,9 @@ static inline void softmax_fp32(float *input, float *output, int32_t ldI,
     float max_core = 0.0;  // max value of the current core
     float sum = 0.0;       // sum of the exp values of the current core
 
+    uint32_t core_idx = snrt_cluster_core_idx();
+    start_cycle[core_idx] = snrt_mcycle;
+
     for (int32_t b = 0; b < batch_size; b++) {
         for (int32_t s = 0; s < seq_len; s++) {
             max_core = -INFINITY;
@@ -67,6 +70,7 @@ static inline void softmax_fp32(float *input, float *output, int32_t ldI,
             }
         }
     }
+    end_cycle[core_idx] = snrt_mcycle;
 
     snrt_cluster_hw_barrier();
 }
