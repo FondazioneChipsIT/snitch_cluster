@@ -10,6 +10,9 @@ Then load the modules Bender and QuestaSim (or Verilator).
 After these steps follow the base tutorial [documentation pages](https://pulp-platform.github.io/snitch_cluster/ug/tutorial.html) from "Building the hardware".
 You should get 0 errors, if you get some check all the dependencies. GLHF -Luca
 
+# Addition to the codes
+All the codes that have been added are under the PLAY_codes and benchmark folder. There you will also find some informations in the Readme files.
+
 # Snitch Cluster
 
 This repository hosts the hardware and software for the Snitch cluster and its generator. Snitch is a high-efficiency compute cluster platform focused on floating-point workloads. It is developed as part of the PULP project, a joint effort between ETH Zurich and the University of Bologna.
