@@ -1,10 +1,10 @@
 // Luca Colombo Chips-IT 2025
-/* FIR filter */
+/* DWT filter */
 
 // Snitch runtime library
 #include "snrt.h"
 #include "data.h"
-#include "fir_opt.h"
+#include "DWT_opt.h"
 
 int main(){
     // Core ID and core count
@@ -16,11 +16,13 @@ int main(){
 
         // Pointers to TCDM memory, spaced by LEN 
         x = (double *)snrt_l1_next();
-        y = x + LEN;
-        h = y + LEN;
+        y_low = x + LEN;
+        y_high = y_low + LEN;
+        h = y_high + LEN;
+        g = h + FILTER_LEN;
 
         // If pointers are null -> break
-        if (!x || !y || !h) {
+        if (!x || !y_low || !y_high || !h || !g) {
             printf("Memory allocation failed!\n");
             return -1;
         } 
@@ -50,7 +52,7 @@ int main(){
     
         // Call the kernel
 
-        fir_opt(chunk_per_core, offset, x, y, h);
+        dwt_opt(chunk_per_core, offset, x, y_low, y_high, h, g);
 
     }
 

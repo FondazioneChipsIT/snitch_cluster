@@ -130,6 +130,7 @@ SN_APPS += $(SN_ROOT)/sw/PLAY_codes/linalg_lu_solve
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/kmeans_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/exp_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/FIR
+SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/DWT
 # LLM
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/attention_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/gelu_b

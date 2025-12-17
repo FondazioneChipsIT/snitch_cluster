@@ -5,15 +5,14 @@
 #include "matrix_mul_opt.h"
 
 /* Print first/last elements  */
-bool PRINT_RESULTS = 1;
+bool PRINT_RESULTS = 0;
 
 bool use_opt = 1;
 
 void matmul_simple_f64(uint32_t chunk_per_core, uint32_t offset,
-                    uint64_t *start_cycle, uint64_t *end_cycle,
                     double *mat_a, double* mat_b, double *dst){
     
-    *start_cycle = snrt_mcycle();
+    snrt_mcycle();
 
     for (int i = offset; i < offset + chunk_per_core; ++i) {
         for (int j = 0; j < elems; ++j) {
@@ -27,7 +26,7 @@ void matmul_simple_f64(uint32_t chunk_per_core, uint32_t offset,
         }
     }
 
-    *end_cycle = snrt_mcycle();
+    snrt_mcycle();
 
     return;
 }
@@ -72,39 +71,15 @@ int main() {
         }
 
         if(use_opt) 
-            matrix_mul_opt(chunk_per_core,offset, &start_cycle[core_idx], &end_cycle[core_idx], mat_a, mat_b, dst);
+            matrix_mul_opt(chunk_per_core,offset, mat_a, mat_b, dst);
         else
-            matmul_simple_f64(chunk_per_core,offset, &start_cycle[core_idx], &end_cycle[core_idx], mat_a, mat_b, dst);
+            matmul_simple_f64(chunk_per_core,offset, mat_a, mat_b, dst);
 
-        total_cycles[core_idx] = end_cycle[core_idx] - start_cycle[core_idx];
-        if(use_opt) 
-            //                         2 fmadd per elems(row) *elems (in a row) + 1 fadd each elems time
-            flop_cycle[core_idx] = ((double)chunk_per_core * elems *elems * 2.0 + (double)chunk_per_core * elems) / (double)total_cycles[core_idx];
-        else 
-            flop_cycle[core_idx] = ((double)chunk_per_core * elems *elems * 2.0) / (double)total_cycles[core_idx];
     }
 
     snrt_cluster_hw_barrier();
 
-    if (core_idx == 0) {
-
-        // Mean performance values
-        uint64_t mean_cycles=0;
-        double mean_flop_cycle = 0.0;
-        double total_flop_cycle = 0.0;
-
-        for(uint32_t cid = 0; cid < ncores; cid ++){
-            mean_cycles += total_cycles[cid];
-            total_flop_cycle += flop_cycle[cid];
-        }
-        mean_cycles /= ncores;
-        mean_flop_cycle = total_flop_cycle/ncores;
-
-        if(use_opt) printf("Opt. version!\n");
-        printf("Matrix multiplication %dx%d performance\n",elems,elems);
-        printf("Mean cycles: %llu\n", (unsigned long long)mean_cycles);
-        printf("Mean FLOP/cycle: %f\n", mean_flop_cycle);
-        printf("Total FLOP/cycle: %f\n", total_flop_cycle);
+    if (PRINT_RESULTS && core_idx == 0) {
 
        // Print all results, not recommended for matrices larger than 8x8
         if(elems == 8){
@@ -119,7 +94,7 @@ int main() {
                 printf("\n");
             }
         }   // Print results for sanity check
-        else if(PRINT_RESULTS){
+        else{
             for(uint32_t i=0; i<7; i++){ // first eight elements of first row
                 printf("mat_mul(0,%d): %.2f\n",i, dst[i]);
             }

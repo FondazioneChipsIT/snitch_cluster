@@ -1,7 +1,6 @@
 // Luca Colombo Chips-IT 2025
 //
 void matrix_mul_opt(uint32_t chunk_per_core, uint32_t offset,
-                    uint64_t *start_cycle, uint64_t *end_cycle,
                     double *mat_a, double* mat_b, double *dst){
 
     double zero = 0.0; // Zero register
@@ -13,7 +12,7 @@ void matrix_mul_opt(uint32_t chunk_per_core, uint32_t offset,
     : [zero] "r"(&zero)
     : "ft4");
 
-    *start_cycle = snrt_mcycle();
+    snrt_mcycle();
     
     // Read the mat_a matrix with a 1 stride-> access a row
     snrt_ssr_loop_1d(SNRT_SSR_DM0, elems*elems, sizeof(double));
@@ -60,7 +59,8 @@ void matrix_mul_opt(uint32_t chunk_per_core, uint32_t offset,
 
     snrt_ssr_disable();
     snrt_fpu_fence();
-    *end_cycle = snrt_mcycle();
+    
+    snrt_mcycle();
 
     return;
 }
