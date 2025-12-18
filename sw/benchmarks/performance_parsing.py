@@ -13,9 +13,15 @@ num_elements = input("Number of elements: ").strip()
 # PERCORSI
 # ============================
 script_dir = os.path.dirname(os.path.abspath(__file__))
-
 results_dir = os.path.join(script_dir, "results")
 os.makedirs(results_dir, exist_ok=True)
+
+# Cartella dedicata al kernel
+kernel_dir = os.path.join(results_dir, kernel_name)
+os.makedirs(kernel_dir, exist_ok=True)
+
+# CSV unico per tutto il benchmark
+csv_file = os.path.join(kernel_dir, f"{kernel_name}_results.csv")
 
 # Risali fino alla root di snitch_cluster
 current_dir = script_dir
@@ -37,11 +43,9 @@ if not files:
     raise FileNotFoundError("Nessun file trace_hart_*.txt trovato")
 
 # ============================
-# FILE OUTPUT
+# FILE OUTPUT PER NUM_ELEMENTS
 # ============================
-txt_file = os.path.join(results_dir, f"{kernel_name}_{num_elements}_performance.txt")
-csv_file = os.path.join(results_dir, "benchmark_results.csv")
-
+txt_file = os.path.join(kernel_dir, f"{num_elements}_performance.txt")
 txt = open(txt_file, "w")
 
 def log_print(msg):
@@ -57,7 +61,7 @@ log_print("")
 log_print(f"{'Core':<5} {'Cycles':<10} {'IPC':<8} {'FLOPs/cyc':<10}")
 
 # ============================
-# CSV (append)
+# CSV (append se esiste)
 # ============================
 csv_exists = os.path.isfile(csv_file)
 csv_f = open(csv_file, "a", newline="")
@@ -79,7 +83,6 @@ flops_list = []
 
 # ============================
 # Lista istruzioni FLOP generiche su RISC-V
-# fmadd/fmsub/fnmadd/fnmsub -> 2 FLOP, tutte le altre -> 1 FLOP
 # ============================
 fpu_flop_2 = ["fmadd", "fmsub", "fnmadd", "fnmsub"]
 fpu_flop_1 = ["fadd", "fsub", "fmul", "fdiv", "fsgnj", "fsgnjn", "fsgnjx", "fmin", "fmax"]
@@ -112,10 +115,7 @@ for core_id, file_path in enumerate(files):
         m = pattern.search(line)
         if m:
             instr = m.group(1).lower()
-            if instr in fpu_flop_2:
-                flop_count += 2
-            else:
-                flop_count += 1
+            flop_count += 2 if instr in fpu_flop_2 else 1
 
     flops_per_cycle = flop_count / cycles if cycles > 0 else 0.0
 
@@ -145,6 +145,5 @@ log_print(f"FLOPs/cycle : {sum(flops_list)/len(flops_list):.4f}")
 txt.close()
 csv_f.close()
 
-print("\nOutput generato:")
-print(f"- TXT : {txt_file}")
-print(f"- CSV : {csv_file}")
+print(f"\nOutput generato nella cartella {kernel_dir}")
+print(f"CSV unico per il benchmark: {csv_file}")

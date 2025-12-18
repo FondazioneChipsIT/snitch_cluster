@@ -6,8 +6,6 @@ void fir_opt(uint32_t chunk_per_core, uint32_t offset,
     double zero = 0.0;
 
     snrt_mcycle();
-    
-    
 
     for (uint32_t n = offset; n < offset + chunk_per_core; n++) {
 

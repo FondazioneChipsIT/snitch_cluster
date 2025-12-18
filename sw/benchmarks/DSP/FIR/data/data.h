@@ -5,7 +5,7 @@ double *x,*y,*h;
 
 // Vector length (for now only a multiple of ncores, default 8)
 #ifndef LEN
-#define LEN 128
+#define LEN 1024
 #endif
 // If you exceed TCDM size you get 0 as result
 // Max size is 128KB/8bytes (64bits for doubles) = 16k theoretically -> 8K theoretical for each vector!
@@ -13,7 +13,7 @@ double *x,*y,*h;
 
 // Vector length (for now only a multiple of ncores, default 8)
 #ifndef FILTER_LEN
-#define FILTER_LEN 16
+#define FILTER_LEN 512
 #endif
 
 
