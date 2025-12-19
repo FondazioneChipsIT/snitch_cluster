@@ -6,7 +6,7 @@
 #include "data.h"
 #include "conv3_opt.h"
 
-bool use_opt = 0;
+bool use_opt = 1;
 
 void conv3naive(uint32_t chunk_per_core, uint32_t offset,
     double *x, double *y, double *h){
@@ -74,7 +74,7 @@ int main(){
     
         // Call the kernel
         if(use_opt)
-            conv3_opt(chunk_per_core, offset, x, y, h);
+            conv3_opt_V2(chunk_per_core, offset, x, y, h);
         else
             conv3naive(chunk_per_core, offset, x, y, h);
 

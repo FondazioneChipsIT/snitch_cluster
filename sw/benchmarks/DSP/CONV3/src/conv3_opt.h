@@ -1,7 +1,10 @@
 // Luca Colombo Chips-IT 2025
 /* Conv3-> mutliply each time 3 times, so no need for C loops
    This helps us accelerate the kernel by using 2d loop*/
-void conv3_opt(uint32_t chunk_per_core, uint32_t offset,
+
+
+// Worse than the naive versione, 0.19 FLOP/cycle vs 0.30
+void conv3_opt_V1(uint32_t chunk_per_core, uint32_t offset,
     double *x, double *y, double *h){
 
     double zero = 0.0;
@@ -40,15 +43,21 @@ void conv3_opt(uint32_t chunk_per_core, uint32_t offset,
 
     return;
 }
-// Could work, need to fix, is it worth the effort?
 
-/* uint32_t tot_ops = chunk_per_core*CONV3_LEN;
+// Better than the naive versione, 0.40 FLOP/cycle vs 0.30!!!!
+
+void conv3_opt_V2(uint32_t chunk_per_core, uint32_t offset,
+    double *x, double *y, double *h){
+
+    double zero = 0.0;
+
+    snrt_mcycle();
     
-    // Read x chunk per core times, each time 3 times, then roll back by 1
-    snrt_ssr_loop_2d(SNRT_SSR_DM0,chunk_per_core, CONV3_LEN,-(CONV3_LEN-2)*sizeof(double),sizeof(double));
+    // Read x chunk per core times, each time 3 times, then go forward by 1 (after loop1, it goes back to the start, so need to +1)
+    snrt_ssr_loop_2d(SNRT_SSR_DM0, CONV3_LEN, chunk_per_core, sizeof(double), sizeof(double));
 
-    // Read h 3 times, then rollback for chunk_per_core_times
-    snrt_ssr_loop_2d(SNRT_SSR_DM1, chunk_per_core, CONV3_LEN, -(CONV3_LEN-1)*sizeof(double), sizeof(double)); 
+    // Read h 3 times, then repeat for chunk_per_core_times
+    snrt_ssr_loop_2d(SNRT_SSR_DM1, CONV3_LEN, chunk_per_core, sizeof(double) , 0); 
 
     // Write y
     snrt_ssr_loop_1d(SNRT_SSR_DM2, chunk_per_core, sizeof(double)); 
@@ -71,5 +80,14 @@ void conv3_opt(uint32_t chunk_per_core, uint32_t offset,
     "fmadd.d ft3, ft0, ft1, ft3\n"
     "fadd.d ft2, ft3, ft4\n"     // storeback
     :
-    : [n_frep] "r"(tot_ops-1),[zero] "r"(&zero)
-    : "ft0", "ft1", "ft2", "ft3", "ft4", "memory");*/
+    : [n_frep] "r"(chunk_per_core-1),[zero] "r"(&zero)
+    : "ft0", "ft1", "ft2", "ft3", "ft4", "memory");
+
+    snrt_ssr_disable();
+    snrt_fpu_fence();
+
+
+    snrt_mcycle();
+
+    return;
+}
