@@ -132,6 +132,7 @@ SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/exp_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/FIR
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/DWT
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/CONV3
+SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/CONV3x3
 # LLM
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/attention_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/gelu_b

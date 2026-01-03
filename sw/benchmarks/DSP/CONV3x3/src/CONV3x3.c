@@ -1,46 +1,27 @@
 // Luca Colombo Chips-IT 2025
-/* CONV3 filter */
+/* CONV3x3 2d filter */
 
 // Snitch runtime library
 #include "snrt.h"
 #include "data.h"
-#include "conv3_opt.h"
+#include "conv3x3_opt.h"
 
 bool use_opt = 1;
-
-void conv3naive(uint32_t chunk_per_core, uint32_t offset,
-    double *x, double *y, double *h){
-    
-    uint32_t temp_cycle1, temp_cycle2;
-    temp_cycle1 = snrt_mcycle();
-
-    for(uint32_t n = offset; n<offset+chunk_per_core; n++){
-        double acc = 0.0;
-        for(uint32_t i = 0 ; i<CONV3_LEN; i++){
-            acc += x[n+i]*h[i];
-        }
-        y[n] = acc;
-    }
-
-    temp_cycle2 = snrt_mcycle();
-
-    temp_cycle1 = temp_cycle2 - temp_cycle1;
-
-    return;
-}
 
 int main(){
     // Core ID and core count
     uint32_t core_idx = snrt_cluster_core_idx();
     uint32_t ncores = snrt_cluster_compute_core_num();
 
+    // Output matrix (no padding)
+    uint32_t OUT_LEN = (LEN-2)*(LEN-2);
     // DM core allocates memory in TCDM and initializes the vectors
     if(snrt_is_dm_core()){
 
         // Pointers to TCDM memory, spaced by LEN 
         x = (double *)snrt_l1_next();
-        y = x + LEN;
-        h = y + LEN;
+        y = x + LEN*LEN;
+        h = y + OUT_LEN;
 
         // If pointers are null -> break
         if (!x || !y || !h) {
@@ -49,12 +30,12 @@ int main(){
         } 
 
         // Initialize the values of vectors, can change as you like
-        for(uint32_t i = 0; i<LEN; i++){
+        for(uint32_t i = 0; i<LEN*LEN; i++){
             x[i] = (double)i;
             
         }
 
-        for(uint32_t i=0; i<CONV3_LEN;i++){
+        for(uint32_t i=0; i<CONV3x3_LEN*CONV3x3_LEN;i++){
             h[i] = (double)(i);
         }
 
@@ -65,8 +46,10 @@ int main(){
     // Only the compute cores do something
     if(snrt_is_compute_core()){
 
-        // Compute the chunk of the vector per core, and the offset that is used to space them
+        // Compute the chunk of the matrix, represents
+        // the number of rows each core has to use
         uint32_t chunk_per_core = LEN/ncores;
+
         if(chunk_per_core == 0){
             printf("Chunk for each core is 0!\n");
             return -2;
@@ -76,10 +59,9 @@ int main(){
         
     
         // Call the kernel
-        if(use_opt)
-            conv3_opt_V2(chunk_per_core, offset, x, y, h);
-        else
-            conv3naive(chunk_per_core, offset, x, y, h);
+
+        conv3x3_opt(chunk_per_core, offset, x, y, h);
+
 
     }
 

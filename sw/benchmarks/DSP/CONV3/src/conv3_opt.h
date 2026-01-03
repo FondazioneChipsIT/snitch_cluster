@@ -64,18 +64,18 @@ void conv3_opt_V2(uint32_t chunk_per_core, uint32_t offset,
 
     snrt_ssr_enable();
 
-    // Start from an offset n
+    // Start from offset
     snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_2D, x + offset);
     // No offset for h
     snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_2D, h);
     // Y writeback
-    snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, y+offset);
+    snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, y + offset);
 
     asm volatile(  
-    "frep.o %[n_frep], 6, 0, 0 \n" // Repeat tot_ops times
+    "frep.o %[n_frep], 6, 0, 0 \n" // Repeat chunk times
     "fld ft3, 0(%[zero])\n"        // acc = 0
     "fld ft4, 0(%[zero])\n"        // temp = 0
-    "fmadd.d ft3, ft0, ft1, ft3\n" // 3 time like the filter size
+    "fmadd.d ft3, ft0, ft1, ft3\n" // 3 time like the filter size, need to change for CONV5 or 7
     "fmadd.d ft3, ft0, ft1, ft3\n"
     "fmadd.d ft3, ft0, ft1, ft3\n"
     "fadd.d ft2, ft3, ft4\n"     // storeback
