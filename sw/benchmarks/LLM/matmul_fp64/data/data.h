@@ -4,7 +4,7 @@
 /* Square matrix dimension */
 /* Max size: 24. 24*24*3(num of matrices) * 64 bits/element --> 110,592 bits, so 110KiB*/
 #ifndef elems
-#define elems 128
+#define elems 32
 #endif
 
 /* TCDM pointers  */

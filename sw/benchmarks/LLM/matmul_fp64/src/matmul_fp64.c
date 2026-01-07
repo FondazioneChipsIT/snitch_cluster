@@ -7,7 +7,7 @@
 /* Print first/last elements  */
 bool PRINT_RESULTS = 0;
 
-bool use_opt = 1;
+bool use_opt = 0;
 
 void matmul_simple_f64(uint32_t chunk_per_core, uint32_t offset,
                     double *mat_a, double* mat_b, double *dst){

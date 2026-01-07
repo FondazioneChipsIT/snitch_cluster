@@ -58,7 +58,10 @@ def log_print(msg):
 log_print(f"Kernel: {kernel_name}")
 log_print(f"Elements: {num_elements}")
 log_print("")
-log_print(f"{'Core':<5} {'Cycles':<10} {'IPC':<8} {'FLOPs/cyc':<10}")
+log_print(
+    f"{'Core':<5} {'Cycles':<10} {'IPC':<8} "
+    f"{'FLOPs_alg/cyc':<15} {'FLOPs_sust/cyc':<15}"
+)
 
 # ============================
 # CSV (append se esiste)
@@ -71,7 +74,8 @@ if not csv_exists:
     csv_writer.writerow([
         "kernel", "elements", "core",
         "cycles", "ipc",
-        "flops_per_cycle"
+        "flops_alg_per_cycle",
+        "flops_sust_per_cycle"
     ])
 
 # ============================
@@ -79,13 +83,17 @@ if not csv_exists:
 # ============================
 cycles_list = []
 ipc_list = []
-flops_list = []
+flops_alg_list = []
+flops_sust_list = []
 
 # ============================
-# Lista istruzioni FLOP generiche su RISC-V
+# Lista istruzioni FLOP RISC-V
 # ============================
 fpu_flop_2 = ["fmadd", "fmsub", "fnmadd", "fnmsub"]
-fpu_flop_1 = ["fadd", "fsub", "fmul", "fdiv", "fsgnj", "fsgnjn", "fsgnjx", "fmin", "fmax"]
+fpu_flop_1 = [
+    "fadd", "fsub", "fmul", "fdiv",
+    "fsgnj", "fsgnjn", "fsgnjx", "fmin", "fmax"
+]
 
 all_fpu_instr = fpu_flop_1 + fpu_flop_2
 pattern = re.compile(r"\b(" + "|".join(all_fpu_instr) + r")\b", re.IGNORECASE)
@@ -97,50 +105,73 @@ for core_id, file_path in enumerate(files):
     with open(file_path, "r") as f:
         lines = f.readlines()
 
+    # ------------------------
     # Cicli e IPC
+    # ------------------------
     content = "".join(lines)
-    match = re.search(r"Performance metrics for section 1.*?\n((?:.*\n?)*)", content, re.S)
+    match = re.search(
+        r"Performance metrics for section 1.*?\n((?:.*\n?)*)",
+        content,
+        re.S
+    )
     if not match:
         continue
+
     section = match.group(1)
     cycles = int(re.search(r"^\s*cycles\s+(\d+)", section, re.M).group(1))
     ipc = float(re.search(r"^\s*total_ipc\s+([\d\.]+)", section, re.M).group(1))
 
-    # ============================
-    # CONTO FLOP GENERICO
-    # ============================
-    flop_count = 0
+    # ------------------------
+    # CONTO FLOP
+    # ------------------------
+    flop_alg = 0
+    flop_sust = 0
+
     for line in lines:
-        line = line.strip()
         m = pattern.search(line)
-        if m:
-            instr = m.group(1).lower()
-            flop_count += 2 if instr in fpu_flop_2 else 1
+        if not m:
+            continue
 
-    flops_per_cycle = flop_count / cycles if cycles > 0 else 0.0
+        instr = m.group(1).lower()
 
-    # ============================
+        # Sustained FLOPs: tutte le FP ops
+        flop_sust += 2 if instr in fpu_flop_2 else 1
+
+        # Algorithmic FLOPs: solo FMAs
+        if instr in fpu_flop_2:
+            flop_alg += 2
+
+    flops_alg_per_cycle = flop_alg / cycles if cycles > 0 else 0.0
+    flops_sust_per_cycle = flop_sust / cycles if cycles > 0 else 0.0
+
+    # ------------------------
     # Salva dati
-    # ============================
+    # ------------------------
     cycles_list.append(cycles)
     ipc_list.append(ipc)
-    flops_list.append(flops_per_cycle)
+    flops_alg_list.append(flops_alg_per_cycle)
+    flops_sust_list.append(flops_sust_per_cycle)
 
-    log_print(f"{core_id:<5} {cycles:<10} {ipc:<8.3f} {flops_per_cycle:<10.4f}")
+    log_print(
+        f"{core_id:<5} {cycles:<10} {ipc:<8.3f} "
+        f"{flops_alg_per_cycle:<15.4f} {flops_sust_per_cycle:<15.4f}"
+    )
 
     csv_writer.writerow([
         kernel_name, num_elements, core_id,
         cycles, ipc,
-        flops_per_cycle
+        flops_alg_per_cycle,
+        flops_sust_per_cycle
     ])
 
 # ============================
 # MEDIE CLUSTER
 # ============================
 log_print("\nCluster average:")
-log_print(f"Cycles      : {sum(cycles_list)/len(cycles_list):.2f}")
-log_print(f"IPC         : {sum(ipc_list)/len(ipc_list):.3f}")
-log_print(f"FLOPs/cycle : {sum(flops_list)/len(flops_list):.4f}")
+log_print(f"Cycles            : {sum(cycles_list)/len(cycles_list):.2f}")
+log_print(f"IPC               : {sum(ipc_list)/len(ipc_list):.3f}")
+log_print(f"FLOPs_alg/cycle   : {sum(flops_alg_list)/len(flops_alg_list):.4f}")
+log_print(f"FLOPs_sust/cycle  : {sum(flops_sust_list)/len(flops_sust_list):.4f}")
 
 txt.close()
 csv_f.close()
