@@ -1,0 +1,18 @@
+Kernel: CONV3x3_naive
+Elements: 32
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     6333       0.612    0.3411          0.3411         
+1     6357       0.609    0.3398          0.3398         
+2     6364       0.609    0.3394          0.3394         
+3     6377       0.608    0.3387          0.3387         
+4     6390       0.606    0.3380          0.3380         
+5     6376       0.608    0.3388          0.3388         
+6     6408       0.606    0.3371          0.3371         
+7     3243       0.603    0.3330          0.3330         
+
+Cluster average:
+Cycles            : 5981.00
+IPC               : 0.607
+FLOPs_alg/cycle   : 0.3382
+FLOPs_sust/cycle  : 0.3382

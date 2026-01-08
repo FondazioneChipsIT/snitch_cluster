@@ -2,6 +2,8 @@
 These are benchmarks either already present in the kernels folder or newly written.
 They have been copied and renamed in this folder for organizations sake.
 
+The matmul kernel is more optimized than the one found in the PLAY_Codes to showcase how one can fully optimize the implementation on Snitch.
+
 # Extracting performance metrics
 Launch the simulation of the code, make the traces found in the log folder. Afterwards launch the script performance_cycles.py, it will print the cycles/IPC/FLOP/GLOPs for each core and the mean for the cluster. 
 

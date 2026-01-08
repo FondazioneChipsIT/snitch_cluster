@@ -5,8 +5,9 @@
 #include "snrt.h"
 #include "data.h"
 #include "conv3x3_opt.h"
+#include "conv3x3_naive.h"
 
-bool use_opt = 1;
+bool use_opt = 0;
 
 int main(){
     // Core ID and core count
@@ -56,7 +57,10 @@ int main(){
         uint32_t offset = core_idx*chunk_per_core;
         
         // Call the kernel
-        conv3x3_opt(core_idx,chunk_per_core, offset, x, y, h);
+        if(use_opt)
+            conv3x3_opt(core_idx,chunk_per_core, offset, x, y, h);
+        else 
+            conv3x3_naive(core_idx,chunk_per_core, offset, x, y, h);
 
     }
 

@@ -38,7 +38,6 @@ with open(csv_file, newline="") as f:
         flops_alg = float(row["flops_alg_per_cycle"])
         flops_sust = float(row["flops_sust_per_cycle"])
 
-        # Escludi entry 0.0
         if cycles == 0.0 or flops_alg == 0.0 or flops_sust == 0.0:
             continue
 
@@ -79,96 +78,49 @@ mean_flops_alg = mean_dict(data, "flops_alg")
 mean_flops_sust = mean_dict(data, "flops_sust")
 mean_cycles = mean_dict(data, "cycles")
 
-mean_flops_naive = {
-    N: np.mean(vals) for N, vals in data_naive.items()
-} if has_naive else None
+mean_flops_naive = {N: np.mean(vals) for N, vals in data_naive.items()} if has_naive else None
 
 # ============================
-# PLOT 1: Cycles vs N (log scale)
+# PLOT COMBINATO FLOPs_alg + speedup
 # ============================
-cycles_means = []
-min_cycles = []
-max_cycles = []
+fig, ax1 = plt.subplots(figsize=(8,5))
 
-for N in sorted_N:
-    vals = [p["cycles"] for p in data[N]]
-    cycles_means.append(np.mean(vals))
-    min_cycles.append(np.min(vals))
-    max_cycles.append(np.max(vals))
+# FLOPs kernel ottimizzato
+ax1.plot(sorted_N, [mean_flops_alg[N] for N in sorted_N], "o-", label=kernel_name)
+ax1.set_xlabel("N")
+ax1.set_ylabel("FLOPs_alg / cycle ", color="tab:blue")
+ax1.tick_params(axis='y', labelcolor="tab:blue")
+ax1.grid(True, which="both", ls="--", lw=0.5)
 
-plt.figure(figsize=(8,5))
-plt.plot(sorted_N, cycles_means, "o-", label="Mean")
-plt.fill_between(sorted_N, min_cycles, max_cycles, alpha=0.2, label="Min-Max")
-plt.xlabel("N (numero elementi)")
-plt.ylabel("Cycles (core mean)")
-plt.title(f"{kernel_name}  Cycles vs N (log scale)")
-plt.yscale("log")
-plt.grid(True, which="both", ls="--", lw=0.5)
-plt.legend()
-plt.savefig(os.path.join(kernel_dir, f"{kernel_name}_cycles_vs_N_log.png"), dpi=300, bbox_inches="tight")
-plt.close()
-
-# ============================
-# PLOT 2: FLOPs_alg/cycle vs N (lineare, senza barre)
-# ============================
-flops_alg_means = []
-for N in sorted_N:
-    vals = [p["flops_alg"] for p in data[N]]
-    flops_alg_means.append(np.mean(vals))
-
-plt.figure(figsize=(8,5))
-plt.plot(sorted_N, flops_alg_means, "o-", label=kernel_name)
+# FLOPs naive
 if has_naive:
-    plt.plot(sorted_N, [mean_flops_naive[N] for N in sorted_N], "o--", label=naive_kernel)
-plt.xlabel("N (numero elementi)")
-plt.ylabel("FLOPs_alg / cycle")
-plt.title(f"{kernel_name}  Algorithmic FLOPs/cycle vs N")
-plt.grid(True)
-plt.legend()
-plt.savefig(os.path.join(kernel_dir, f"{kernel_name}_flops_alg_per_cycle_vs_N.png"),
-            dpi=300, bbox_inches="tight")
-plt.close()
+    ax1.plot(sorted_N, [mean_flops_naive[N] for N in sorted_N], "s--", color="tab:green", label=naive_kernel)
 
-# ============================
-# PLOT 3: FLOPs_sust/cycle vs N (lineare, senza barre)
-# ============================
-flops_sust_means = []
-for N in sorted_N:
-    vals = [p["flops_sust"] for p in data[N]]
-    flops_sust_means.append(np.mean(vals))
-
-plt.figure(figsize=(8,5))
-plt.plot(sorted_N, flops_sust_means, "o-")
-plt.xlabel("N (numero elementi)")
-plt.ylabel("FLOPs_sust / cycle")
-plt.title(f"{kernel_name}  Sustained FLOPs/cycle vs N")
-plt.grid(True)
-plt.savefig(os.path.join(kernel_dir, f"{kernel_name}_flops_sust_per_cycle_vs_N.png"),
-            dpi=300, bbox_inches="tight")
-plt.close()
-
-# ============================
-# PLOT 4: SPEEDUP vs NAIVE
-# ============================
+# Speedup asse y secondario
 if has_naive:
+    ax2 = ax1.twinx()
     speedup = []
-    Ns_speedup = []
     for N in sorted_N:
         if N in mean_flops_naive and mean_flops_naive[N] > 0:
             speedup.append(mean_flops_alg[N] / mean_flops_naive[N])
-            Ns_speedup.append(N)
+        else:
+            speedup.append(np.nan)
 
-    plt.figure(figsize=(8,5))
-    plt.plot(Ns_speedup, speedup, "o-")
-    plt.xlabel("N (numero elementi)")
-    plt.ylabel("Speedup (FLOPs_alg/cycle)")
-    plt.title(f"{kernel_name} vs {naive_kernel}  Speedup")
-    plt.grid(True)
-    plt.savefig(os.path.join(kernel_dir, f"{kernel_name}_speedup_vs_naive.png"),
-                dpi=300, bbox_inches="tight")
-    plt.close()
-    print(f"Speedup plot generato (vs {naive_kernel})")
+    ax2.plot(sorted_N, speedup, "r-o", label="Speedup vs naive")  # linea rossa continua con cerchi
+    ax2.set_ylabel("Speedup vs naive", color="tab:red")
+    ax2.tick_params(axis='y', labelcolor="tab:red")
+
+# Titolo e legenda combinata
+lines_1, labels_1 = ax1.get_legend_handles_labels()
+if has_naive:
+    lines_2, labels_2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines_1 + lines_2, labels_1 + labels_2)
 else:
-    print(f"Kernel naive '{naive_kernel}' non trovato  speedup non generato")
+    ax1.legend()
 
-print(f"Tutti i plot generati nella cartella: {kernel_dir}")
+plt.title(f"{kernel_name} vs {naive_kernel}")
+plt.savefig(os.path.join(kernel_dir, f"{kernel_name}_flops_alg_and_speedup_dual.png"),
+            dpi=300, bbox_inches="tight")
+plt.close()
+
+print(f"Plot FLOPs_alg/cycle + speedup con due scale generato nella cartella: {kernel_dir}")
