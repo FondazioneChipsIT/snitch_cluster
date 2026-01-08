@@ -41,8 +41,8 @@ with open(csv_file, newline="") as f:
         if cycles == 0.0 or flops_alg == 0.0 or flops_sust == 0.0:
             continue
 
-        elements = row["elements"]
-        data[elements].append({
+        N = row["elements"]
+        data[N].append({
             "cycles": cycles,
             "flops_alg": flops_alg,
             "flops_sust": flops_sust,
@@ -51,7 +51,7 @@ with open(csv_file, newline="") as f:
 sorted_N = sorted(data.keys(), key=lambda x: float(x))
 
 # ============================
-# LEGGI CSV (naive, se esiste)
+# LEGGI CSV (naive)
 # ============================
 data_naive = defaultdict(list)
 
@@ -59,68 +59,159 @@ if has_naive:
     with open(naive_csv, newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
+            cycles = float(row["cycles"])
             flops_alg = float(row["flops_alg_per_cycle"])
-            if flops_alg == 0.0:
+
+            if cycles == 0.0 or flops_alg == 0.0:
                 continue
-            elements = row["elements"]
-            data_naive[elements].append(flops_alg)
+
+            N = row["elements"]
+            data_naive[N].append({
+                "cycles": cycles,
+                "flops_alg": flops_alg,
+            })
 
 # ============================
-# UTILITY: media per N
+# UTILITY
 # ============================
 def mean_dict(data_dict, key):
-    out = {}
-    for N in data_dict:
-        out[N] = np.mean([p[key] for p in data_dict[N]])
-    return out
+    return {
+        N: np.mean([p[key] for p in data_dict[N]])
+        for N in data_dict
+    }
 
 mean_flops_alg = mean_dict(data, "flops_alg")
-mean_flops_sust = mean_dict(data, "flops_sust")
 mean_cycles = mean_dict(data, "cycles")
 
-mean_flops_naive = {N: np.mean(vals) for N, vals in data_naive.items()} if has_naive else None
+mean_flops_naive = (
+    mean_dict(data_naive, "flops_alg") if has_naive else {}
+)
+mean_cycles_naive = (
+    mean_dict(data_naive, "cycles") if has_naive else {}
+)
 
 # ============================
-# PLOT COMBINATO FLOPs_alg + speedup
+# PLOT 1: Cycles vs N (log, mean + minmax)
+# ============================
+plt.figure(figsize=(8,5))
+
+# --- kernel ottimizzato ---
+cycles_mean = []
+cycles_min = []
+cycles_max = []
+
+for N in sorted_N:
+    vals = [p["cycles"] for p in data[N]]
+    cycles_mean.append(np.mean(vals))
+    cycles_min.append(np.min(vals))
+    cycles_max.append(np.max(vals))
+
+plt.plot(sorted_N, cycles_mean, "o-", label=f"{kernel_name} mean")
+plt.fill_between(
+    sorted_N, cycles_min, cycles_max,
+    alpha=0.2
+)
+
+# --- kernel naive ---
+if has_naive:
+    common_N_cycles = [N for N in sorted_N if N in data_naive]
+
+    naive_mean = []
+    naive_min = []
+    naive_max = []
+
+    for N in common_N_cycles:
+        vals = [p["cycles"] for p in data_naive[N]]
+        naive_mean.append(np.mean(vals))
+        naive_min.append(np.min(vals))
+        naive_max.append(np.max(vals))
+
+    plt.plot(
+        common_N_cycles,
+        naive_mean,
+        "s--",
+        color="tab:green",
+        label=f"{naive_kernel} mean"
+    )
+    plt.fill_between(
+        common_N_cycles,
+        naive_min,
+        naive_max,
+        alpha=0.2,
+        color="tab:green"
+    )
+
+plt.xlabel("N")
+plt.ylabel("Cycles (core mean)")
+plt.title(f"{kernel_name}  Cycles vs N (log scale)")
+plt.yscale("log")
+plt.grid(True, which="both", ls="--", lw=0.5)
+plt.legend()
+
+plt.savefig(
+    os.path.join(kernel_dir, f"{kernel_name}_cycles_vs_N_log.png"),
+    dpi=300,
+    bbox_inches="tight"
+)
+plt.close()
+
+# ============================
+# PLOT 2: FLOPs_alg + naive + speedup
 # ============================
 fig, ax1 = plt.subplots(figsize=(8,5))
 
 # FLOPs kernel ottimizzato
-ax1.plot(sorted_N, [mean_flops_alg[N] for N in sorted_N], "o-", label=kernel_name)
-ax1.set_xlabel("N")
-ax1.set_ylabel("FLOPs_alg / cycle ", color="tab:blue")
-ax1.tick_params(axis='y', labelcolor="tab:blue")
-ax1.grid(True, which="both", ls="--", lw=0.5)
+ax1.plot(
+    sorted_N,
+    [mean_flops_alg[N] for N in sorted_N],
+    "o-",
+    label=kernel_name
+)
 
 # FLOPs naive
-if has_naive:
-    ax1.plot(sorted_N, [mean_flops_naive[N] for N in sorted_N], "s--", color="tab:green", label=naive_kernel)
+common_N = [N for N in sorted_N if N in mean_flops_naive]
 
-# Speedup asse y secondario
-if has_naive:
+if has_naive and common_N:
+    ax1.plot(
+        common_N,
+        [mean_flops_naive[N] for N in common_N],
+        "s--",
+        color="tab:green",
+        label=naive_kernel
+    )
+
+ax1.set_xlabel("N")
+ax1.set_ylabel("FLOPs_alg / cycle")
+ax1.grid(True, which="both", ls="--", lw=0.5)
+
+# Speedup
+if has_naive and common_N:
     ax2 = ax1.twinx()
-    speedup = []
-    for N in sorted_N:
-        if N in mean_flops_naive and mean_flops_naive[N] > 0:
-            speedup.append(mean_flops_alg[N] / mean_flops_naive[N])
-        else:
-            speedup.append(np.nan)
+    speedup = [
+        mean_flops_alg[N] / mean_flops_naive[N]
+        for N in common_N
+    ]
 
-    ax2.plot(sorted_N, speedup, "r-o", label="Speedup vs naive")  # linea rossa continua con cerchi
-    ax2.set_ylabel("Speedup vs naive", color="tab:red")
-    ax2.tick_params(axis='y', labelcolor="tab:red")
+    ax2.plot(
+        common_N,
+        speedup,
+        "r-o",
+        label="Speedup vs naive"
+    )
+    ax2.set_ylabel("Speedup vs naive")
 
-# Titolo e legenda combinata
-lines_1, labels_1 = ax1.get_legend_handles_labels()
-if has_naive:
-    lines_2, labels_2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines_1 + lines_2, labels_1 + labels_2)
+    l1, lab1 = ax1.get_legend_handles_labels()
+    l2, lab2 = ax2.get_legend_handles_labels()
+    ax1.legend(l1 + l2, lab1 + lab2)
 else:
     ax1.legend()
 
 plt.title(f"{kernel_name} vs {naive_kernel}")
-plt.savefig(os.path.join(kernel_dir, f"{kernel_name}_flops_alg_and_speedup_dual.png"),
-            dpi=300, bbox_inches="tight")
+plt.savefig(
+    os.path.join(kernel_dir, f"{kernel_name}_flops_alg_and_speedup_dual.png"),
+    dpi=300,
+    bbox_inches="tight"
+)
 plt.close()
 
-print(f"Plot FLOPs_alg/cycle + speedup con due scale generato nella cartella: {kernel_dir}")
+print(f"Tutti i plot generati in: {kernel_dir}")
