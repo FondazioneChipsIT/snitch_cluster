@@ -140,6 +140,7 @@ SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/gelu_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/layernorm_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/softmax_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/matmul_fp64
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/residual
 endif
 
 # Include Makefile from each app subdirectory
