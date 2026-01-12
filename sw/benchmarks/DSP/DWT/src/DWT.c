@@ -6,6 +6,40 @@
 #include "data.h"
 #include "DWT_opt.h"
 
+void dwt_naive(uint32_t chunk_per_core, uint32_t offset,
+               double *x, double *y_low, double *y_high,
+               double *h, double *g){
+    snrt_mcycle();
+    for (uint32_t n = 0; n < chunk_per_core; n++) {
+
+        uint32_t out = offset + n;
+        uint32_t center = 2 * out;
+
+        /* Numero di tap effettivi (gestione bordo sinistro) */
+        uint32_t taps = (center < FILTER_LEN) ? (center + 1) : FILTER_LEN;
+
+        double acc_low  = 0.0;
+        double acc_high = 0.0;
+
+        /*
+         * Convoluzione:
+         * x[center - k] * h[k]
+         * x[center - k] * g[k]
+         */
+        for (uint32_t k = 0; k < taps; k++) {
+            double sample = x[center - k];
+            acc_low  += sample * h[k];
+            acc_high += sample * g[k];
+        }
+
+        y_low[out]  = acc_low;
+        y_high[out] = acc_high;
+    }
+    snrt_mcycle();
+}
+
+bool use_opt = 1;
+
 int main(){
     // Core ID and core count
     uint32_t core_idx = snrt_cluster_core_idx();
@@ -74,8 +108,10 @@ int main(){
         uint32_t offset = core_idx * chunk_per_core;
 
         // Call the kernel
-        dwt_opt(chunk_per_core, offset, x, y_low, y_high, h, g);
-
+        if(use_opt)
+            dwt_opt(chunk_per_core, offset, x, y_low, y_high, h, g);
+        else
+            dwt_naive(chunk_per_core, offset, x, y_low, y_high, h, g);
     }
 
     snrt_cluster_hw_barrier(); // Barrier syncronization

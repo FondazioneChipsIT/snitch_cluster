@@ -6,6 +6,27 @@
 #include "data.h"
 #include "fir_opt.h"
 
+void fir_naive(uint32_t chunk_per_core, uint32_t offset,
+               double *x, double *y, double *h){
+    snrt_mcycle();
+    for (uint32_t n = offset; n < offset + chunk_per_core; n++) {
+
+        double acc = 0.0;
+
+        /* Gestione del bordo sinistro */
+        uint32_t taps = (n < FILTER_LEN) ? (n + 1) : FILTER_LEN;
+
+        for (uint32_t k = 0; k < taps; k++) {
+            acc += x[n - k] * h[k];
+        }
+
+        y[n] = acc;
+    }
+    snrt_mcycle();
+}
+
+bool use_opt = 1;
+
 int main(){
     // Core ID and core count
     uint32_t core_idx = snrt_cluster_core_idx();
@@ -49,8 +70,10 @@ int main(){
         
     
         // Call the kernel
-
-        fir_opt(chunk_per_core, offset, x, y, h);
+        if(use_opt)
+            fir_opt(chunk_per_core, offset, x, y, h);
+        else    
+            fir_naive(chunk_per_core, offset, x, y, h);
 
     }
 

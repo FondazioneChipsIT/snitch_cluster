@@ -20,195 +20,236 @@ kernel_dir = os.path.join(results_dir, kernel_name)
 csv_file = os.path.join(kernel_dir, f"{kernel_name}_results.csv")
 
 if not os.path.isfile(csv_file):
-    raise FileNotFoundError(f"CSV del kernel '{kernel_name}' non trovato: {csv_file}")
+    raise FileNotFoundError(f"CSV del kernel '{kernel_name}' non trovato")
 
 naive_dir = os.path.join(results_dir, naive_kernel)
 naive_csv = os.path.join(naive_dir, f"{naive_kernel}_results.csv")
 has_naive = os.path.isfile(naive_csv)
 
 # ============================
-# LEGGI CSV (kernel principale)
+# LETTURA CSV
 # ============================
-data = defaultdict(list)
-
-with open(csv_file, newline="") as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        cycles = float(row["cycles"])
-        flops_alg = float(row["flops_alg_per_cycle"])
-        flops_sust = float(row["flops_sust_per_cycle"])
-
-        if cycles == 0.0 or flops_alg == 0.0 or flops_sust == 0.0:
-            continue
-
-        N = row["elements"]
-        data[N].append({
-            "cycles": cycles,
-            "flops_alg": flops_alg,
-            "flops_sust": flops_sust,
-        })
-
-sorted_N = sorted(data.keys(), key=lambda x: float(x))
-
-# ============================
-# LEGGI CSV (naive)
-# ============================
-data_naive = defaultdict(list)
-
-if has_naive:
-    with open(naive_csv, newline="") as f:
+def read_csv(path, has_sust):
+    data = defaultdict(list)
+    with open(path, newline="") as f:
         reader = csv.DictReader(f)
-        for row in reader:
-            cycles = float(row["cycles"])
-            flops_alg = float(row["flops_alg_per_cycle"])
+        for r in reader:
+            cycles = float(r["cycles"])
+            flops_alg = float(r["flops_alg_per_cycle"])
 
-            if cycles == 0.0 or flops_alg == 0.0:
+            if cycles == 0 or flops_alg == 0:
                 continue
 
-            N = row["elements"]
-            data_naive[N].append({
+            entry = {
                 "cycles": cycles,
-                "flops_alg": flops_alg,
-            })
+                "flops_alg": flops_alg
+            }
+
+            if has_sust:
+                entry["flops_sust"] = float(r["flops_sust_per_cycle"])
+
+            data[r["elements"]].append(entry)
+    return data
+
+data_opt = read_csv(csv_file, has_sust=True)
+data_naive = read_csv(naive_csv, has_sust=False) if has_naive else {}
+
+sorted_N = sorted(data_opt.keys(), key=lambda x: float(x))
 
 # ============================
-# UTILITY
+# STATISTICHE
 # ============================
-def mean_dict(data_dict, key):
-    return {
-        N: np.mean([p[key] for p in data_dict[N]])
-        for N in data_dict
-    }
+def stats(data, key):
+    out = {}
+    for N in data:
+        vals = [v[key] for v in data[N]]
+        out[N] = {
+            "mean": np.mean(vals),
+            "min": np.min(vals),
+            "max": np.max(vals)
+        }
+    return out
 
-mean_flops_alg = mean_dict(data, "flops_alg")
-mean_cycles = mean_dict(data, "cycles")
+stats_flops_opt = stats(data_opt, "flops_alg")
+stats_cycles_opt = stats(data_opt, "cycles")
+stats_flops_sust_opt = stats(data_opt, "flops_sust")
 
-mean_flops_naive = (
-    mean_dict(data_naive, "flops_alg") if has_naive else {}
-)
-mean_cycles_naive = (
-    mean_dict(data_naive, "cycles") if has_naive else {}
-)
+stats_flops_naive = stats(data_naive, "flops_alg") if has_naive else {}
+stats_cycles_naive = stats(data_naive, "cycles") if has_naive else {}
 
 # ============================
-# PLOT 1: Cycles vs N (log, mean + minmax)
+# PREPARAZIONE ISTOGRAMMI
 # ============================
-plt.figure(figsize=(8,5))
+bar_width = 0.35
+group_spacing = 0.6
 
-# --- kernel ottimizzato ---
-cycles_mean = []
-cycles_min = []
-cycles_max = []
+x_positions = []
+labels = []
 
+x = 0.0
 for N in sorted_N:
-    vals = [p["cycles"] for p in data[N]]
-    cycles_mean.append(np.mean(vals))
-    cycles_min.append(np.min(vals))
-    cycles_max.append(np.max(vals))
+    x_positions.append(x)
+    labels.append(N)
+    x += 1.0 + group_spacing
 
-plt.plot(sorted_N, cycles_mean, "o-", label=f"{kernel_name} mean")
-plt.fill_between(
-    sorted_N, cycles_min, cycles_max,
-    alpha=0.2
+x_positions = np.array(x_positions)
+
+# ============================
+# COLORI
+# ============================
+COLOR_OPT = "tab:orange"
+COLOR_NAIVE = "tab:blue"
+
+# ============================
+# PLOT 1: FLOPs_alg / cycle + speedup + min/max
+# ============================
+fig, ax1 = plt.subplots(figsize=(10, 5))
+
+# OPT
+opt_means = [stats_flops_opt[N]["mean"] for N in sorted_N]
+opt_err = [
+    [
+        stats_flops_opt[N]["mean"] - stats_flops_opt[N]["min"],
+        stats_flops_opt[N]["max"] - stats_flops_opt[N]["mean"]
+    ] for N in sorted_N
+]
+
+ax1.bar(
+    x_positions - bar_width / 2,
+    opt_means,
+    width=bar_width,
+    color=COLOR_OPT,
+    label=kernel_name,
+    yerr=np.array(opt_err).T,
+    capsize=4
 )
 
-# --- kernel naive ---
+# NAIVE (solo dove esiste)
 if has_naive:
-    common_N_cycles = [N for N in sorted_N if N in data_naive]
+    naive_means = []
+    naive_err = []
+    for N in sorted_N:
+        if N in stats_flops_naive:
+            naive_means.append(stats_flops_naive[N]["mean"])
+            naive_err.append([
+                stats_flops_naive[N]["mean"] - stats_flops_naive[N]["min"],
+                stats_flops_naive[N]["max"] - stats_flops_naive[N]["mean"]
+            ])
+        else:
+            naive_means.append(0)
+            naive_err.append([0, 0])
 
-    naive_mean = []
-    naive_min = []
-    naive_max = []
-
-    for N in common_N_cycles:
-        vals = [p["cycles"] for p in data_naive[N]]
-        naive_mean.append(np.mean(vals))
-        naive_min.append(np.min(vals))
-        naive_max.append(np.max(vals))
-
-    plt.plot(
-        common_N_cycles,
-        naive_mean,
-        "s--",
-        color="tab:green",
-        label=f"{naive_kernel} mean"
-    )
-    plt.fill_between(
-        common_N_cycles,
-        naive_min,
-        naive_max,
-        alpha=0.2,
-        color="tab:green"
+    ax1.bar(
+        x_positions + bar_width / 2,
+        naive_means,
+        width=bar_width,
+        color=COLOR_NAIVE,
+        label=naive_kernel,
+        yerr=np.array(naive_err).T,
+        capsize=4
     )
 
-plt.xlabel("N")
-plt.ylabel("Cycles (core mean)")
-plt.title(f"{kernel_name}  Cycles vs N (log scale)")
-plt.yscale("log")
-plt.grid(True, which="both", ls="--", lw=0.5)
-plt.legend()
+ax1.set_ylabel("FLOPs / cycle (alg)")
+ax1.set_xlabel("N (elements)")
+ax1.set_xticks(x_positions)
+ax1.set_xticklabels(labels)
+ax1.grid(True, axis="y", ls="--", lw=0.5)
 
+# Speedup
+if has_naive:
+    ax2 = ax1.twinx()
+
+    xs = []
+    ys = []
+    for i, N in enumerate(sorted_N):
+        if N in stats_flops_naive:
+            xs.append(x_positions[i])
+            ys.append(
+                stats_flops_opt[N]["mean"] /
+                stats_flops_naive[N]["mean"]
+            )
+
+    ax2.plot(xs, ys, "ro-", label="Speedup opt / naive")
+    ax2.set_ylabel("Speedup")
+
+    h1, l1 = ax1.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax1.legend(h1 + h2, l1 + l2)
+else:
+    ax1.legend()
+
+plt.title(f"{kernel_name}: FLOPs_alg / cycle (minmax)")
+plt.tight_layout()
 plt.savefig(
-    os.path.join(kernel_dir, f"{kernel_name}_cycles_vs_N_log.png"),
+    os.path.join(kernel_dir, f"{kernel_name}_hist_flops_alg_speedup_minmax.png"),
     dpi=300,
     bbox_inches="tight"
 )
 plt.close()
 
 # ============================
-# PLOT 2: FLOPs_alg + naive + speedup
+# PLOT 2: CYCLES (log scale)
 # ============================
-fig, ax1 = plt.subplots(figsize=(8,5))
+fig, ax = plt.subplots(figsize=(10, 5))
 
-# FLOPs kernel ottimizzato
-ax1.plot(
-    sorted_N,
-    [mean_flops_alg[N] for N in sorted_N],
-    "o-",
+ax.bar(
+    x_positions - bar_width / 2,
+    [stats_cycles_opt[N]["mean"] for N in sorted_N],
+    width=bar_width,
+    color=COLOR_OPT,
     label=kernel_name
 )
 
-# FLOPs naive
-common_N = [N for N in sorted_N if N in mean_flops_naive]
-
-if has_naive and common_N:
-    ax1.plot(
-        common_N,
-        [mean_flops_naive[N] for N in common_N],
-        "s--",
-        color="tab:green",
+if has_naive:
+    ax.bar(
+        x_positions + bar_width / 2,
+        [stats_cycles_naive[N]["mean"] if N in stats_cycles_naive else 0 for N in sorted_N],
+        width=bar_width,
+        color=COLOR_NAIVE,
         label=naive_kernel
     )
 
-ax1.set_xlabel("N")
-ax1.set_ylabel("FLOPs_alg / cycle")
-ax1.grid(True, which="both", ls="--", lw=0.5)
+ax.set_yscale("log")
+ax.set_ylabel("Cycles")
+ax.set_xlabel("N (elements)")
+ax.set_xticks(x_positions)
+ax.set_xticklabels(labels)
+ax.grid(True, which="both", axis="y", ls="--", lw=0.5)
+ax.legend()
 
-# Speedup
-if has_naive and common_N:
-    ax2 = ax1.twinx()
-    speedup = [
-        mean_flops_alg[N] / mean_flops_naive[N]
-        for N in common_N
-    ]
-
-    ax2.plot(
-        common_N,
-        speedup,
-        "r-o",
-        label="Speedup vs naive"
-    )
-    ax2.set_ylabel("Speedup vs naive")
-
-    l1, lab1 = ax1.get_legend_handles_labels()
-    l2, lab2 = ax2.get_legend_handles_labels()
-    ax1.legend(l1 + l2, lab1 + lab2)
-else:
-    ax1.legend()
-
-plt.title(f"{kernel_name} vs {naive_kernel}")
+plt.title(f"{kernel_name}: Cycles (log scale)")
+plt.tight_layout()
 plt.savefig(
-    os.path.join(kernel_dir, f"{kernel_name}_flops_alg_and_speedup_dual.png"),
+    os.path.join(kernel_dir, f"{kernel_name}_hist_cycles_log.png"),
+    dpi=300,
+    bbox_inches="tight"
+)
+plt.close()
+
+# ============================
+# PLOT 3: FLOPs_sust / cycle
+# ============================
+fig, ax = plt.subplots(figsize=(10, 5))
+
+ax.bar(
+    x_positions,
+    [stats_flops_sust_opt[N]["mean"] for N in sorted_N],
+    width=bar_width,
+    color=COLOR_OPT,
+    label=f"{kernel_name} sustained"
+)
+
+ax.set_ylabel("FLOPs / cycle (sustained)")
+ax.set_xlabel("N (elements)")
+ax.set_xticks(x_positions)
+ax.set_xticklabels(labels)
+ax.grid(True, axis="y", ls="--", lw=0.5)
+ax.legend()
+
+plt.title(f"{kernel_name}: FLOPs_sust / cycle")
+plt.tight_layout()
+plt.savefig(
+    os.path.join(kernel_dir, f"{kernel_name}_hist_flops_sust.png"),
     dpi=300,
     bbox_inches="tight"
 )

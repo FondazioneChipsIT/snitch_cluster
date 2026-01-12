@@ -5,19 +5,19 @@ double *x,*y_low, *y_high,*h,*g;
 
 // Vector length (for now only a multiple of ncores, default 8)
 #ifndef LEN
-#define LEN 8032
+#define LEN 2048
 #endif
 // If you exceed TCDM size you get 0 as result
 // Max size is 128KB/8bytes (64bits for doubles) = 16k theoretically -> 8K theoretical for each vector!
 // but in reality only 4120
 
-// Vector length (for now only a multiple of ncores, default 8)
+// Filter length
 #ifndef FILTER_LEN
 #define FILTER_LEN 32
 #endif
 
 // High filter in L2
-double h_L2[32] = {0.0544158422430816,
+double h_L2[FILTER_LEN] = {0.0544158422430816,
     0.3128715909142999,
     0.6756307362972898,
     0.5853546836548691,

@@ -13,7 +13,7 @@ double *x,*y,*h;
 
 // Vector length (for now only a multiple of ncores, default 8)
 #ifndef FILTER_LEN
-#define FILTER_LEN 512
+#define FILTER_LEN 64
 #endif
 
 
