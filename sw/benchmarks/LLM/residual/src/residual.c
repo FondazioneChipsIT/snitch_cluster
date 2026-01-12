@@ -4,8 +4,25 @@
 // Snitch runtime library
 #include "snrt.h"
 #include "data.h"
-#include "conv3x3_opt.h"
 #include "residual_opt.h"
+
+void residual_naive(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
+    double *x, double *y, double *out){
+    
+    snrt_mcycle();
+
+    // Chunk per core is the number of rows, we need the total amount
+    uint32_t tot_ops = chunk_per_core*LEN;
+
+    for (uint32_t i = offset; i<offset + tot_ops; i++){
+
+        out[i] = x[i]+y[i];
+
+    }
+    snrt_mcycle();
+}
+
+bool use_opt = 1;
 
 int main(){
     // Core ID and core count
@@ -18,10 +35,9 @@ int main(){
         x = (double *)snrt_l1_next();
         out = x + LEN*LEN;
         y = out + LEN*LEN;
-        h = y + LEN*LEN;
 
         // If pointers are null -> break
-        if (!x || !y || !h) {
+        if (!x || !y || !out) {
             printf("Memory allocation failed!\n");
             return -1;
         } 
@@ -29,11 +45,7 @@ int main(){
         // Initialize the values of vectors, can change as you like
         for(uint32_t i = 0; i<LEN*LEN; i++){
             x[i] = (double)i;
-            
-        }
-
-        for(uint32_t i=0; i<CONV3x3_LEN*CONV3x3_LEN;i++){
-            h[i] = (double)(i);
+            y[i] = (double)i;
         }
 
     }
@@ -48,41 +60,12 @@ int main(){
         uint32_t chunk_per_core = LEN/ncores;
         // Offset to index the correct chunk of data per core
         uint32_t offset = core_idx*chunk_per_core;
-        
-        // We first compute the convolution
-        conv3x3_opt(core_idx,chunk_per_core, offset, x, y, h);
 
-        //Padding
-        if(core_idx==0){
-            for(uint32_t i=0; i<LEN-2;i++){
-                for(uint32_t j= LEN-2; j<LEN;j++){
-                    y[i*LEN + j]= 0.1;
-                }
-
-            }
-            for(uint32_t i=LEN-2; i<LEN;i++){
-                for(uint32_t j= 0; j<LEN;j++){
-                    y[i*LEN + j ]= 0.1;
-                }
-            }
-        }
-
-    }
-
-    snrt_cluster_hw_barrier(); // Barrier syncronization
-
-    // Only the compute cores do something
-    if(snrt_is_compute_core()){
-
-        // Compute the chunk of the matrix, represents
-        // the number of rows each core has to use
-        uint32_t chunk_per_core = LEN/ncores;
-        // Offset to index the correct chunk of data per core
-        uint32_t offset = core_idx*chunk_per_core;
-        
         // We call the residual kernel
-        residual_opt(core_idx,chunk_per_core, offset, x, y, out);
-
+        if(use_opt)
+            residual_opt(core_idx,chunk_per_core, offset, x, y, out);
+        else
+            residual_naive(core_idx,chunk_per_core, offset, x, y, out);
     }
 
     return 0;
