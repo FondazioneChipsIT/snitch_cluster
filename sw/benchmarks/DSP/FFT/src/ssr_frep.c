@@ -48,7 +48,6 @@ static void fft_inner(uint32_t N, double *x, double *y, double *twiddle, bool mu
             : [tw_re] "r"(&twiddle[(j*js+j0)*n+0]), [tw_im] "r"(&twiddle[(j*js+j0)*n+1])
             : "ft5", "ft6", "memory");
 
-			
 			asm volatile (
                 "frep.o %[n_frep], 8, 0, 0\n"
 				"fmul.d    ft4, ft5, ft0 \n"
@@ -70,8 +69,9 @@ static void fft_inner(uint32_t N, double *x, double *y, double *twiddle, bool mu
 		snrt_partial_barrier(barr, 8);
 
 		// Synchronize and swap buffers.
-		double *tmp = x;
-		x = y;
+		// Need to use align or it will give misaligned stores
+		double *tmp = (double *) snrt_align_up(x, 8);
+		x = (double *) snrt_align_up(y, 8);
 		y = tmp;
 	}
 	y = x;

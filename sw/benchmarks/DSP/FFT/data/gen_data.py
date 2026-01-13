@@ -1,62 +1,78 @@
-#!/usr/bin/env python3
-
 import numpy as np
+import random
 import os
 
-def rand_matrix(N, M, seed):
-    rng = np.random.default_rng(seed)
-    return rng.uniform(low=-10.0, high=10.0, size=(N, M)).astype(np.float64)
+# ==========================
+# Configuration
+# ==========================
+N = 128          # number of complex FFT points
+RANGE = 10.0    # Range of the complex numbers
 
-def twiddle(N):
-    v = np.exp(-2j * np.pi * np.arange(N//2) / N)
-    v = v.astype(np.complex128)
-    return np.array((np.real(v), np.imag(v))).transpose()
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+out_file = os.path.join(SCRIPT_DIR, "data.h")
 
-def complex_mul(a, b):
-    return np.array((
-        a[:,0]*b[:,0] - a[:,1]*b[:,1],
-        a[:,0]*b[:,1] + a[:,1]*b[:,0],
-    )).transpose()
+# ==========================
+# Generate input data
+# ==========================
+x = np.array(
+    [random.uniform(-RANGE, RANGE) + 1j * random.uniform(-RANGE, RANGE)
+     for _ in range(N)],
+    dtype=np.complex128
+)
 
-def fft(x, twiddle):
-    if x.shape[0] == 1:
-        return x
-    else:
-        E = fft(x[0::2,:], twiddle)
-        O = fft(x[1::2,:], twiddle)
-        tw = twiddle(x.shape[0])
-        twO = complex_mul(tw, O)
-        return np.concatenate((
-            E + twO,
-            E - twO
-        ), axis=0)
+input_interleaved = np.empty(2 * N, dtype=np.float64)
+input_interleaved[0::2] = x.real
+input_interleaved[1::2] = x.imag
 
-def emit(out, name, array):
-    print(f".global {name}", file=out)
-    print(".align 3", file=out)
-    print(f"{name}:", file=out)
-    bs = array.tobytes()
-    for i in range(0, len(bs), 4):
-        s = ""
-        for n in range(4):
-            s += "%02x" % bs[i+3-n]
-        print(f"    .word 0x{s}", file=out)
+# ==========================
+# Golden FFT (reference)
+# ==========================
+X = np.fft.fft(x)
 
-# =========================
-# Main
-# =========================
+golden_interleaved = np.empty(2 * N, dtype=np.float64)
+golden_interleaved[0::2] = X.real
+golden_interleaved[1::2] = X.imag
 
-N = 128
-x = rand_matrix(N, 2, 1)
-y = fft(x, twiddle)
+# ==========================
+# Twiddle factors
+# Flat layout:
+# twiddle[2*k+0] = cos(2*pi*k/N)
+# twiddle[2*k+1] = sin(2*pi*k/N)
+# ==========================
+twiddle_interleaved = np.empty(2 * N, dtype=np.float64)
+for k in range(N):
+    angle = -2.0 * np.pi * k / N
+    twiddle_interleaved[2*k + 0] = np.cos(angle)
+    twiddle_interleaved[2*k + 1] = np.sin(angle)
 
-# Cartella dove si trova lo script
-script_dir = os.path.dirname(os.path.abspath(__file__))
-out_path = os.path.join(script_dir, "data.S")
+# ==========================
+# Write single data.h
+# ==========================
+with open(out_file, "w") as f:
+    f.write("#ifndef DATA_H\n")
+    f.write("#define DATA_H\n\n")
 
-with open(out_path, "w") as out:
-    print('.section .l1,"aw",@progbits', file=out)
-    emit(out, "input_size", np.array(N, dtype=np.uint32))
-    emit(out, "input", x)
-    emit(out, "input_twiddle", twiddle(N))
-    emit(out, "output", y)
+    f.write(f"#define FFT_N {N}\n\n")
+
+    # Input
+    f.write("double input[FFT_N * 2] __attribute__((aligned(8))) = {\n")
+    for v in input_interleaved:
+        f.write(f"    {v:.17e},\n")
+    f.write("};\n\n")
+
+    # Twiddle (FLAT, no braces)
+    f.write("double twiddle[FFT_N * 2] __attribute__((aligned(8))) = {\n")
+    for v in twiddle_interleaved:
+        f.write(f"    {v:.17e},\n")
+    f.write("};\n\n")
+
+    # Golden output
+    f.write("double golden[FFT_N * 2] __attribute__((aligned(8))) = {\n")
+    for v in golden_interleaved:
+        f.write(f"    {v:.17e},\n")
+    f.write("};\n\n")
+
+    f.write("#endif // DATA_H\n")
+
+print(f"Generated {out_file}")
+print(f"FFT size: {N} complex points ({2*N} doubles per array)")

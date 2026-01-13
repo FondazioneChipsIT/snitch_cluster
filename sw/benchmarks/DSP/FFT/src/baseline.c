@@ -1,9 +1,11 @@
 static void fft_base(uint32_t N, double *x, double *y, double *twiddle, int par) {
 	uint32_t core_id = snrt_cluster_core_idx();
 	uint32_t core_num = snrt_cluster_compute_core_num();
+
     snrt_mcycle();
     // Define a generic barrier
 	snrt_barrier_t *barr;
+	
 	for (uint32_t n = N, s = 1; n > 1; n /= 2, s *= 2) {
 		uint32_t j0 = 0, js = 1, j1 = s;
 		uint32_t i0 = 0, is = 1, i1 = n/2;
@@ -90,8 +92,8 @@ static void fft_base(uint32_t N, double *x, double *y, double *twiddle, int par)
 			}
 			// asm volatile ("loop_j_end:");
 		}
-		double *tmp = x;
-		x = y;
+		double *tmp = (double *) snrt_align_up(x, 8);
+		x = (double *) snrt_align_up(y, 8);
 		y = tmp;
 		if (par) snrt_partial_barrier(barr, 8);
 	}

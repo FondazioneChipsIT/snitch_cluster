@@ -11,7 +11,6 @@ void dwt_opt(uint32_t chunk_per_core, uint32_t offset,
         uint32_t out = offset + n;
         uint32_t center = 2 * out;
         uint32_t taps = (center < FILTER_LEN) ? (center + 1) : FILTER_LEN;
-        uint32_t reps = taps - 1;
 
         asm volatile(
             "fld ft3, 0(%[zero])\n"
@@ -32,7 +31,7 @@ void dwt_opt(uint32_t chunk_per_core, uint32_t offset,
             "frep.o %[r], 1, 0, 0\n"
             "fmadd.d ft3, ft0, ft1, ft3\n"
             :
-            : [r] "r"(reps)
+            : [r] "r"(taps - 1)
             : "ft0","ft1","ft3","memory");
         
         snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, x + center);
@@ -42,7 +41,7 @@ void dwt_opt(uint32_t chunk_per_core, uint32_t offset,
             "frep.o %[r], 1, 0, 0\n"
             "fmadd.d ft4, ft0, ft1, ft4\n"
             :
-            : [r] "r"(reps)
+            : [r] "r"(taps - 1)
             : "ft0","ft1","ft4","memory");
 
         asm volatile(
