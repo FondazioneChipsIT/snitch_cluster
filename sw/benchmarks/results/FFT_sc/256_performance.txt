@@ -1,0 +1,11 @@
+Kernel: FFT_sc
+Elements: 256
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     14168      0.731    0.2891          0.7408         
+
+Cluster average:
+Cycles            : 14168.00
+IPC               : 0.731
+FLOPs_alg/cycle   : 0.2891
+FLOPs_sust/cycle  : 0.7408

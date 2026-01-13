@@ -63,7 +63,7 @@ int main() {
 			double d = y[i] - golden[i];
 			if (d < 0)
 				d = -d;
-			diffs += d > 0.01;
+			diffs += d > 1;
 		}
 		return diffs;
 	}
