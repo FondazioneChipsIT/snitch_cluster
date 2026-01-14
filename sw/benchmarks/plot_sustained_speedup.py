@@ -163,7 +163,7 @@ if has_naive:
 else:
     ax1.legend()
 
-plt.title(f"{kernel_name}: FLOPs_sust / cycle + speedup")
+plt.title(f"{kernel_name}: FLOPs_sust / cycle")
 plt.tight_layout()
 plt.savefig(
     os.path.join(kernel_dir, f"{kernel_name}_hist_flops_sust_speedup.png"),

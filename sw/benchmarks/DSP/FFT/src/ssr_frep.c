@@ -9,9 +9,6 @@ static void fft_inner(uint32_t N, double *x, double *y, double *twiddle, bool mu
 	snrt_mcycle();
 	snrt_ssr_enable();
 
-	// Define a generic barrier
-	snrt_barrier_t *barr;
-
 	for (uint32_t n = N, s = 1; n > 1; n /= 2, s *= 2) {
 		uint32_t j0 = 0, js = 1, j1 = s;
 		uint32_t i0 = 0, is = 1, i1 = n/2;
@@ -62,19 +59,19 @@ static void fft_inner(uint32_t N, double *x, double *y, double *twiddle, bool mu
 				: [n_frep] "r"(i1-1)
 				: "ft0", "ft1", "ft3", "ft4", "ft5", "ft6", "memory");
 		}
-		
-		snrt_fpu_fence();
-
-		// Synchronize only worker cores
-		snrt_partial_barrier(barr, 8);
 
 		// Synchronize and swap buffers.
 		// Need to use align or it will give misaligned stores
 		double *tmp = (double *) snrt_align_up(x, 8);
 		x = (double *) snrt_align_up(y, 8);
 		y = tmp;
+	
 	}
-	y = x;
+
+	// Storeback
+	if(core_id == 0)
+		y = x;
+
 	snrt_ssr_disable();
 	snrt_mcycle();
 

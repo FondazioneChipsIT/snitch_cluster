@@ -8,7 +8,7 @@
 #include "data.h"
 
 // Global pointers to L1
-double *local_tw, *local_x;
+double *local_tw, *local_x, *y;
 
 // Multicore or single core
 bool multi_core = 1;
@@ -23,20 +23,20 @@ int main() {
 	// Copy data in TCDM
     if (snrt_is_dm_core()) {
 		// Generate addresses in L1
-		local_x  = (double *)snrt_align_up(snrt_l1_next(), 8);
-		local_tw = (double *)snrt_align_up(local_x + FFT_N*2, 8);
+		local_x  = (double *) snrt_l1_next();
+		local_tw = local_x + FFT_N*2;
+		y = local_tw + FFT_N;
 
-		size_t size = FFT_N*2 * sizeof(double);
+		size_t size1 = FFT_N*2 * sizeof(double);
+		size_t size2 = FFT_N * sizeof(double);
 
-        snrt_dma_start_1d(local_x, input, size);
-        snrt_dma_start_1d(local_tw, twiddle, size);
+        snrt_dma_start_1d(local_x, input, size1);
+        snrt_dma_start_1d(local_tw, twiddle, size2);
         snrt_dma_wait_all();
     }
 
 	snrt_cluster_hw_barrier();
-	// We allocate buffer already in l1
-	double *y = (double *)snrt_align_up(local_tw + FFT_N*2, 8);
-	
+    
 	if(snrt_is_compute_core()){
 
 		if(multi_core){
@@ -60,10 +60,10 @@ int main() {
 	if (core_id == 0) {
 		uint32_t diffs = 0;
 		for (uint32_t i = 0; i < FFT_N; i++) {
-			double d = y[i] - golden[i];
+			double d = y[i] - output[i];
 			if (d < 0)
 				d = -d;
-			diffs += d > 1;
+			diffs += d > 0.01;
 		}
 		return diffs;
 	}
