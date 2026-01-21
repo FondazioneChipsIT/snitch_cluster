@@ -126,6 +126,7 @@ SN_APPS += $(SN_ROOT)/sw/PLAY_codes/matrix_mul_trans_A
 SN_APPS += $(SN_ROOT)/sw/PLAY_codes/matrix_mul_trans_B
 SN_APPS += $(SN_ROOT)/sw/PLAY_codes/linalg_lu_decomp
 SN_APPS += $(SN_ROOT)/sw/PLAY_codes/linalg_lu_solve
+SN_APPS += $(SN_ROOT)/sw/PLAY_codes/linalg_cholesky_decomp
 #DSP 
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/kmeans_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/exp_b
