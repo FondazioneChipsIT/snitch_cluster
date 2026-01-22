@@ -2,7 +2,7 @@
 This folder follows the structure of the repository found at https://github.com/FondazioneChipsIT/PLAY/tree/spatz_support, trying to compare Snitch to Spatz and Pulp Open. 
 Not all codes in that folder have been implemented and the code structure is different (it follows the previouslyy found structure in the snitch cluster codes).
 The data generation is primitive, and if you have some optimizations that could speed up the code they are always welcome, as my coding skills are intermidiate but not as a real coder.
-# CODING 
+# Coding
 If you are new to coding with Snitch and SSRs I recommend starting from the vector codes, they all have the same main and almost same kernel.
 Everything should be adequately commented.
 The last and most complex codes take some time to fully understand the mess that I made (with good results).
@@ -11,7 +11,12 @@ The codes automatically print the metrics.
 If you want you can also use the python script found in the benchmarks folder.
 
 Steps:
-Launch the simulation of the code, make the traces found in the log folder. Afterwards launch the script performance_cycles.py in the benchmark folder, it will print the cycles/IPC/FLOP for each core andthe mean cycles. 
+1)Launch the simulation of the code;
+
+2)Make the traces found in the log folder;
+
+3)Afterwards launch the script performance_parsing.py in the benchmark folder, it will print the cycles/IPC/FLOP for each core andthe mean cycles. 
+
 All the codes implemented by PULP will need this script, while those in this folder will print the perf metrics when executing the code.
 This script can be used for each code that uses the function mccycle() only 2 times (so that section 0 is the boot, section 1 the hot loop and section 2 the end).
 The function should be called before and after the section that we want to analyze. 
