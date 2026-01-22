@@ -5,7 +5,7 @@
 
 // Vector length
 uint32_t LEN = 16;
-double *a,*b,*sum;
+float *a,*b,*sum;
 
 int main(){
     // Core ID and cycle counters
@@ -16,7 +16,7 @@ int main(){
         printf("Hi DM core!\n");
 
         // Pointers to TCDM memory
-        a = (double *)snrt_l1_next();
+        a = (float *)snrt_l1_next();
         b = a + LEN;
         sum = b + LEN;
 
@@ -27,8 +27,8 @@ int main(){
 
         // Initialize the values of vectors
         for(uint32_t i = 0; i<LEN; i++){
-            a[i] = (double)i+1;
-            b[i] = (double)i+1;
+            a[i] = (float)i+1;
+            b[i] = (float)i+1;
             sum[i] = 0.0;
         }
 
@@ -43,9 +43,9 @@ int main(){
 
         // Setup the 1d loop with ssr (tell which streams to use, the size and the size of
         // the elements)
-        snrt_ssr_loop_1d(SNRT_SSR_DM0, LEN, sizeof(double));
-        snrt_ssr_loop_1d(SNRT_SSR_DM1, LEN, sizeof(double));
-        snrt_ssr_loop_1d(SNRT_SSR_DM2, LEN, sizeof(double));
+        snrt_ssr_loop_1d(SNRT_SSR_DM0, LEN/2, sizeof(double));
+        snrt_ssr_loop_1d(SNRT_SSR_DM1, LEN/2, sizeof(double));
+        snrt_ssr_loop_1d(SNRT_SSR_DM2, LEN/2, sizeof(double));
 
         // Read from ft0 and ft1 that will be wired to a and b 
         snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, a); //ft0

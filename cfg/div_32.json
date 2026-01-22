@@ -96,7 +96,7 @@
     ],
     // Templates.
     compute_core_template: {
-        isa: "rv32imaf",
+        isa: "rv32imafd",
         Xdiv_sqrt: true,
         xssr: true,
         xfrep: true,
@@ -127,7 +127,7 @@
         ],
     },
     dma_core_template: {
-        isa: "rv32imaf",
+        isa: "rv32imafd",
         xdma: true,
         xssr: false,
         xfrep: false,

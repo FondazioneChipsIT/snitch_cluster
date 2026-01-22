@@ -1,7 +1,7 @@
 ![CI](https://github.com/pulp-platform/snitch_cluster/actions/workflows/ci.yml/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-# How to use CHIPS-IT without dockers
+# How to use without dockers (CHIPS-IT)
 To use this, before following the GETTING STARTED documentation, execute this command:
 - `source iis-setup.sh`
 

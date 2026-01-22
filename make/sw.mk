@@ -104,6 +104,7 @@ SN_APPS += $(SN_ROOT)/sw/kernels/misc/j3d27pt
 SN_APPS += $(SN_ROOT)/sw/a_Tests/aaa_Test_SSR
 SN_APPS += $(SN_ROOT)/sw/a_Tests/aab_Test_division
 SN_APPS += $(SN_ROOT)/sw/a_Tests/ssr_overhead
+SN_APPS += $(SN_ROOT)/sw/a_Tests/CONV3
 # Codes added to implement the PLAY repository #
 SN_APPS += $(SN_ROOT)/sw/PLAY_codes/hello
 SN_APPS += $(SN_ROOT)/sw/PLAY_codes/vector_axpy
@@ -129,10 +130,8 @@ SN_APPS += $(SN_ROOT)/sw/PLAY_codes/linalg_lu_solve
 SN_APPS += $(SN_ROOT)/sw/PLAY_codes/linalg_cholesky_decomp
 #DSP 
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/kmeans_b
-SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/exp_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/FIR
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/DWT
-SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/CONV3
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/CONV3x3
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/FFT
 # LLM

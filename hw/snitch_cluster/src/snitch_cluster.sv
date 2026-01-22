@@ -27,7 +27,7 @@ module snitch_cluster
   /// Width of physical address.
   parameter int unsigned PhysicalAddrWidth  = 48,
   /// Width of regular data bus.
-  parameter int unsigned NarrowDataWidth    = 64,
+  parameter int unsigned NarrowDataWidth    = 32, //MODIFIED
   /// Width of wide AXI port.
   parameter int unsigned WideDataWidth      = 512,
   /// AXI: id width in.
