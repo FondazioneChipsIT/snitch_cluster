@@ -61,8 +61,11 @@ int main() {
 		uint32_t diffs = 0;
 		for (uint32_t i = 0; i < FFT_N; i++) {
 			double d = y[i] - output[i];
-			if (d < 0)
+			if (d < 0){
 				d = -d;
+				
+			}
+			printf("Index %d: Computed %f, Golden %f, Diff %f\n", i, y[i], output[i], d);
 			diffs += d > 0.01;
 		}
 		return diffs;

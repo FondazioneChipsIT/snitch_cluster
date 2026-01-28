@@ -5,6 +5,10 @@ double *x,*y_low, *y_high,*h,*g;
 // If you exceed TCDM size you get 0 as result
 // Max size is 128KB/8bytes (64bits for doubles) = 16k theoretically -> 8K theoretical for each vector!
 // but in reality only 4120
+// Vector length
+#ifndef LEN
+#define LEN 32
+#endif
 
 // Filter length
 #ifndef FILTER_LEN

@@ -29,7 +29,7 @@ int main(){
         for(uint32_t i = 0; i<LEN; i++){
             a[i] = (float)i+1;
             b[i] = (float)i+1;
-            sum[i] = 0.0;
+            sum[i] = 0.0f;
         }
 
     }
@@ -43,9 +43,9 @@ int main(){
 
         // Setup the 1d loop with ssr (tell which streams to use, the size and the size of
         // the elements)
-        snrt_ssr_loop_1d(SNRT_SSR_DM0, LEN/2, sizeof(double));
-        snrt_ssr_loop_1d(SNRT_SSR_DM1, LEN/2, sizeof(double));
-        snrt_ssr_loop_1d(SNRT_SSR_DM2, LEN/2, sizeof(double));
+        snrt_ssr_loop_1d(SNRT_SSR_DM0, LEN, sizeof(float));
+        snrt_ssr_loop_1d(SNRT_SSR_DM1, LEN, sizeof(float));
+        snrt_ssr_loop_1d(SNRT_SSR_DM2, LEN, sizeof(float));
 
         // Read from ft0 and ft1 that will be wired to a and b 
         snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, a); //ft0
@@ -60,7 +60,7 @@ int main(){
         // Assembly code to add the ft0 and ft1 to ft2
         asm volatile(
             "frep.o %[n_frep], 1, 0, 0 \n"
-            "fadd.d ft2, ft0, ft1\n"
+            "fadd.s ft2, ft0, ft1\n"
             :
             : [ n_frep ] "r"(LEN - 1)
             : "ft0", "ft1", "ft2", "memory");
