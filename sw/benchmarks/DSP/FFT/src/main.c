@@ -8,7 +8,7 @@
 #include "data.h"
 
 // Global pointers to L1
-double *local_tw, *local_x, *y;
+double *local_tw, *local_x, *buffer;
 
 // Multicore or single core
 bool multi_core = 1;
@@ -25,7 +25,7 @@ int main() {
 		// Generate addresses in L1
 		local_x  = (double *) snrt_l1_next();
 		local_tw = local_x + FFT_N*2;
-		y = local_tw + FFT_N;
+		buffer = local_tw + FFT_N;
 
 		size_t size1 = FFT_N*2 * sizeof(double);
 		size_t size2 = FFT_N * sizeof(double);
@@ -36,22 +36,16 @@ int main() {
     }
 
 	snrt_cluster_hw_barrier();
+	
+	double *y;
     
 	if(snrt_is_compute_core()){
 
-		if(multi_core){
-			if(use_opt)
-				fft_inner(FFT_N, local_x, y, local_tw, multi_core);
-			else	
-				fft_base(FFT_N, local_x, y, local_tw, multi_core);
-		}
-		else
-			if(core_id==0){
-				if(use_opt)
-					fft_inner(FFT_N, local_x, y, local_tw, multi_core);
-				else	
-					fft_base(FFT_N, local_x, y, local_tw, multi_core);
-			}
+		if(use_opt)
+			y = fft_inner(FFT_N, local_x, buffer, local_tw);
+		else	
+			y = fft_base(FFT_N, local_x, buffer, local_tw);
+
 	}
 
 	snrt_cluster_hw_barrier();
@@ -65,7 +59,7 @@ int main() {
 				d = -d;
 				
 			}
-			printf("Index %d: Computed %f, Golden %f, Diff %f\n", i, y[i], output[i], d);
+			//printf("Index %d: Computed %f, Golden %f, Diff %f\n", i, y[i], output[i], d);
 			diffs += d > 0.01;
 		}
 		return diffs;

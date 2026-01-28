@@ -2,26 +2,29 @@
    runtime library.
    Luca Colombo, 2026, Chips-IT*/
 
-static void fft_inner(uint32_t N, double *x, double *y, double *twiddle, bool multi_core) {
+	// Define a generic barrier
+   snrt_barrier_t barr;
+
+static double *fft_inner(uint32_t N, double *x, double *y, double *twiddle) {
 	uint32_t core_id = snrt_cluster_core_idx();
 	uint32_t core_num = snrt_cluster_compute_core_num();
+	double *tmp;
 	
 	snrt_mcycle();
 	snrt_ssr_enable();
-
+	
 	for (uint32_t n = N, s = 1; n > 1; n /= 2, s *= 2) {
 		uint32_t j0 = 0, js = 1, j1 = s;
 		uint32_t i0 = 0, is = 1, i1 = n/2;
-		if (multi_core) {
-			if (s < core_num) {
-				i0 = core_id;
-				is = core_num;
-				i1 = n/2 / core_num;
-			} else {
-				j0 = core_id;
-				js = core_num;
-				j1 = s / core_num;
-			}
+
+		if (s < core_num) {
+			i0 = core_id;
+			is = core_num;
+			i1 = n/2 / core_num;
+		} else {
+			j0 = core_id;
+			js = core_num;
+			j1 = s / core_num;
 		}
 
 		snrt_ssr_loop_4d(SNRT_SSR_DM0, 2, 2, i1, j1, 
@@ -62,18 +65,17 @@ static void fft_inner(uint32_t N, double *x, double *y, double *twiddle, bool mu
 
 		// Synchronize and swap buffers.
 		// Need to use align or it will give misaligned stores
-		double *tmp = (double *) snrt_align_up(x, 8);
+	
+		tmp = (double *) snrt_align_up(x, 8);
 		x = (double *) snrt_align_up(y, 8);
 		y = tmp;
-	
-	}
 
-	// Storeback
-	if(core_id == 0)
-		y = x;
+		snrt_fpu_fence();
+		snrt_partial_barrier(&barr, 8);
+	}
 
 	snrt_ssr_disable();
 	snrt_mcycle();
 
-	return;
+	return x;
 }

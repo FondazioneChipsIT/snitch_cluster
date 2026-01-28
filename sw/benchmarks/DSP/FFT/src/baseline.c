@@ -1,4 +1,4 @@
-static void fft_base(uint32_t N, double *x, double *y, double *twiddle, int par) {
+static double *fft_base(uint32_t N, double *x, double *y, double *twiddle) {
 	uint32_t core_id = snrt_cluster_core_idx();
 	uint32_t core_num = snrt_cluster_compute_core_num();
 
@@ -9,17 +9,17 @@ static void fft_base(uint32_t N, double *x, double *y, double *twiddle, int par)
 	for (uint32_t n = N, s = 1; n > 1; n /= 2, s *= 2) {
 		uint32_t j0 = 0, js = 1, j1 = s;
 		uint32_t i0 = 0, is = 1, i1 = n/2;
-		if (par) {
-			if (s < core_num) {
-				i0 = core_id;
-				is = core_num;
-				i1 = n/2 / core_num;
-			} else {
-				j0 = core_id;
-				js = core_num;
-				j1 = s / core_num;
-			}
+
+		if (s < core_num) {
+			i0 = core_id;
+			is = core_num;
+			i1 = n/2 / core_num;
+		} else {
+			j0 = core_id;
+			js = core_num;
+			j1 = s / core_num;
 		}
+	
 		for (uint32_t j = 0; j < j1; ++j) {
 			// asm volatile ("loop_j_start:");
 			double tw_re = twiddle[(j*js+j0)*n+0];
@@ -95,9 +95,8 @@ static void fft_base(uint32_t N, double *x, double *y, double *twiddle, int par)
 		double *tmp = (double *) snrt_align_up(x, 8);
 		x = (double *) snrt_align_up(y, 8);
 		y = tmp;
-		if (par) snrt_partial_barrier(barr, 8);
+		snrt_partial_barrier(barr, 8);
 	}
-	y = x;
     snrt_mcycle();
-	return;
+	return x;
 }

@@ -6,7 +6,7 @@ import os
 # ===============================
 # CONFIGURAZIONE
 # ===============================
-N = 128
+N = 256
 OUTPUT_FILE = "data.h"
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
