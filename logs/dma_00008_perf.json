@@ -1,0 +1,84 @@
+{
+    "aggregate_bw": 0.9642857142857143,
+    "transfers": [
+        {
+            "tstart": 1091,
+            "bytes": 12,
+            "bursts": 1,
+            "tend": 1106,
+            "cycles": 15,
+            "bw": 0.8
+        },
+        {
+            "tstart": 1118,
+            "bytes": 12,
+            "bursts": 1,
+            "tend": 1130,
+            "cycles": 12,
+            "bw": 1.0
+        },
+        {
+            "tstart": 1131,
+            "bytes": 12,
+            "bursts": 1,
+            "tend": 1143,
+            "cycles": 12,
+            "bw": 1.0
+        },
+        {
+            "tstart": 1144,
+            "bytes": 12,
+            "bursts": 1,
+            "tend": 1156,
+            "cycles": 12,
+            "bw": 1.0
+        },
+        {
+            "tstart": 1156,
+            "bytes": 12,
+            "bursts": 1,
+            "tend": 1168,
+            "cycles": 12,
+            "bw": 1.0
+        },
+        {
+            "tstart": 1169,
+            "bytes": 12,
+            "bursts": 1,
+            "tend": 1181,
+            "cycles": 12,
+            "bw": 1.0
+        },
+        {
+            "tstart": 1182,
+            "bytes": 12,
+            "bursts": 1,
+            "tend": 1195,
+            "cycles": 13,
+            "bw": 0.9230769230769231
+        },
+        {
+            "tstart": 1195,
+            "bytes": 12,
+            "bursts": 1,
+            "tend": 1207,
+            "cycles": 12,
+            "bw": 1.0
+        },
+        {
+            "tstart": 1207,
+            "bytes": 12,
+            "bursts": 1,
+            "tend": 1219,
+            "cycles": 12,
+            "bw": 1.0
+        },
+        {
+            "tstart": 2108,
+            "bytes": 0,
+            "bursts": 1,
+            "tend": 2108,
+            "cycles": 0
+        }
+    ]
+}

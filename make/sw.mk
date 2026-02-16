@@ -72,34 +72,8 @@ include $(SN_ROOT)/sw/riscv-tests/riscv-tests.mk
 SN_BUILD_APPS ?= ON
 
 ifeq ($(SN_BUILD_APPS), ON)
-SN_APPS += $(SN_ROOT)/sw/kernels/blas/axpy
-SN_APPS += $(SN_ROOT)/sw/kernels/blas/gemm
-SN_APPS += $(SN_ROOT)/sw/kernels/blas/gemv
-SN_APPS += $(SN_ROOT)/sw/kernels/blas/dot
-SN_APPS += $(SN_ROOT)/sw/kernels/blas/syrk
-SN_APPS += $(SN_ROOT)/sw/kernels/dnn/batchnorm
-# SN_APPS += $(SN_ROOT)/sw/kernels/dnn/conv2d
-# SN_APPS += $(SN_ROOT)/sw/kernels/dnn/fusedconv
-SN_APPS += $(SN_ROOT)/sw/kernels/dnn/gelu
-SN_APPS += $(SN_ROOT)/sw/kernels/dnn/layernorm
-SN_APPS += $(SN_ROOT)/sw/kernels/dnn/maxpool
-SN_APPS += $(SN_ROOT)/sw/kernels/dnn/softmax
-SN_APPS += $(SN_ROOT)/sw/kernels/dnn/flashattention_2
-SN_APPS += $(SN_ROOT)/sw/kernels/dnn/concat
-SN_APPS += $(SN_ROOT)/sw/kernels/dnn/fused_concat_linear
-SN_APPS += $(SN_ROOT)/sw/kernels/dnn/transpose
-SN_APPS += $(SN_ROOT)/sw/kernels/dnn/mha
-SN_APPS += $(SN_ROOT)/sw/kernels/misc/montecarlo/pi_estimation
-SN_APPS += $(SN_ROOT)/sw/kernels/misc/atax
-SN_APPS += $(SN_ROOT)/sw/kernels/misc/correlation
-SN_APPS += $(SN_ROOT)/sw/kernels/misc/covariance
-SN_APPS += $(SN_ROOT)/sw/kernels/misc/doitgen
-SN_APPS += $(SN_ROOT)/sw/kernels/misc/kmeans
-SN_APPS += $(SN_ROOT)/sw/kernels/misc/exp
-SN_APPS += $(SN_ROOT)/sw/kernels/misc/log
-SN_APPS += $(SN_ROOT)/sw/kernels/misc/kbpcpa
-SN_APPS += $(SN_ROOT)/sw/kernels/misc/box3d1r
-SN_APPS += $(SN_ROOT)/sw/kernels/misc/j3d27pt
+# Benhmarks
+SN_APPS += $(SN_ROOT)/sw/benchmarks/matmul_fp32
 endif
 
 # Include Makefile from each app subdirectory

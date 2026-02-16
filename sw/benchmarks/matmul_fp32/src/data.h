@@ -1,0 +1,15 @@
+#ifndef DATA_H
+#define DATA_H
+
+/* Square matrix dimension */
+/* Max size: 24. 24*24*3(num of matrices) * 64 bits/element --> 110,592 bits, so 110KiB*/
+#ifndef elems
+#define elems 32
+#endif
+
+/* TCDM pointers  */
+float *mat_a; 
+float *mat_b; 
+float *dst; 
+
+#endif 

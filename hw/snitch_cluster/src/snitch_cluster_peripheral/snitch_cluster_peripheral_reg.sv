@@ -10,10 +10,10 @@ module snitch_cluster_peripheral_reg (
         input wire s_apb_pwrite,
         input wire [2:0] s_apb_pprot,
         input wire [8:0] s_apb_paddr,
-        input wire [63:0] s_apb_pwdata,
-        input wire [7:0] s_apb_pstrb,
+        input wire [31:0] s_apb_pwdata,
+        input wire [3:0] s_apb_pstrb,
         output logic s_apb_pready,
-        output logic [63:0] s_apb_prdata,
+        output logic [31:0] s_apb_prdata,
         output logic s_apb_pslverr,
 
         input snitch_cluster_peripheral_reg_pkg::snitch_cluster_peripheral_reg__in_t hwif_in,

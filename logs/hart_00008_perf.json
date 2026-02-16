@@ -1,0 +1,33 @@
+[
+    {
+        "start": 20,
+        "snitch_issues": 7592,
+        "tstart": 22,
+        "snitch_loads": 68,
+        "snitch_load_latency": 376,
+        "snitch_fseq_offloads": 4128,
+        "end_fpss": 12574,
+        "fpss_issues": 4128,
+        "fpss_fpu_issues": 2080,
+        "fpss_fpu_latency": 4160,
+        "snitch_stores": 340,
+        "fpss_stores": 2048,
+        "tend": 19375,
+        "end": 19373,
+        "fpss_load_latency": 0,
+        "fpss_loads": 0,
+        "snitch_avg_load_latency": 5.529411764705882,
+        "snitch_occupancy": 0.3922703317143743,
+        "snitch_fseq_rel_offloads": 0.35221843003412967,
+        "fseq_yield": 1.0,
+        "fseq_fpu_yield": 1.0,
+        "fpss_section_latency": 0,
+        "fpss_avg_fpu_latency": 2.0,
+        "fpss_avg_load_latency": 0,
+        "fpss_occupancy": 0.21328924253384313,
+        "fpss_fpu_occupancy": 0.10747132375736282,
+        "fpss_fpu_rel_occupancy": 0.5038759689922481,
+        "cycles": 19354,
+        "total_ipc": 0.6055595742482174
+    }
+]

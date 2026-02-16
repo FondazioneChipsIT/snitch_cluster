@@ -28,3 +28,6 @@ gmon.out
 /tools/
 /build/
 /snitch.egg-info/
+
+#Virtual environments
+/my_env/

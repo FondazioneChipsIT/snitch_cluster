@@ -16,7 +16,7 @@ module snitch import snitch_pkg::*; import riscv_instr::*; #(
   /// Physical Address width of the core.
   parameter int unsigned AddrWidth = 48,
   /// Data width of memory interface.
-  parameter int unsigned DataWidth = 64,
+  parameter int unsigned DataWidth = 32,
   /// Reduced-register extension.
   parameter bit          RVE       = 0,
   /// Enable Snitch DMA as accelerator.
