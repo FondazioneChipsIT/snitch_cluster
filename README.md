@@ -1,6 +1,11 @@
 ![CI](https://github.com/pulp-platform/snitch_cluster/actions/workflows/ci.yml/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
+# How to setup for FP32
+Create a new cfg file in the /cfg folder. Change the DataWidth to 32 bits, remove the "d" extension from the compute cores and the dma core.
+
+Then, change the Start.s file found in the sw/runtime/src folder. This file is used to boot Snitch, putting to zero all the registers. The original file uses a FP64 instruction to do so. Change all the lines that use "fcvt.d.w" to "fcvt.s.w". This will allow Snitch to boot avoiding bootloops that would be otherwise cause by the exeptions.
+
 # Snitch Cluster
 
 This repository hosts the hardware and software for the Snitch cluster and its generator. Snitch is a high-efficiency compute cluster platform focused on floating-point workloads. It is developed as part of the PULP project, a joint effort between ETH Zurich and the University of Bologna.

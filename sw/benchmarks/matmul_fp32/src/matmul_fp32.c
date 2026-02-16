@@ -1,16 +1,16 @@
 // Luca Colombo 2025 CHIPS-IT
-/* Matrix multiplication dst = A*B, only with square matrices */
+/* Matrix multiplication dst_TCDM = A*B, only with square matrices */
 #include "snrt.h"
 #include "data.h"
 #include "matrix_mul_opt.h"
 
 /* Print first/last elements  */
-uint32_t PRINT_RESULTS = 0;
+uint32_t CHECK_RESULTS = 1;
 
 uint32_t use_opt = 1;
 
 void matmul_simple_f32(uint32_t chunk_per_core, uint32_t offset,
-                    float *mat_a, float* mat_b, float *dst){
+                    float *mat_a_TCDM, float* mat_b_TCDM, float *dst_TCDM){
     
     snrt_mcycle();
 
@@ -19,10 +19,10 @@ void matmul_simple_f32(uint32_t chunk_per_core, uint32_t offset,
             float acc = 0.0;
 
             for (int k = 0; k < elems; ++k) {
-                acc += mat_a[i * elems + k] * mat_b[k * elems + j];
+                acc += mat_a_TCDM[i * elems + k] * mat_b_TCDM[k * elems + j];
             }
 
-            dst[i * elems + j] = acc;
+            dst_TCDM[i * elems + j] = acc;
         }
     }
 
@@ -40,18 +40,21 @@ int main() {
     if (snrt_is_dm_core()) {
 
 
-        mat_a = (float *)snrt_l1_next();
-        mat_b = mat_a + elems * elems;
-        dst = mat_b + elems * elems;
+        mat_a_TCDM = (float *)snrt_l1_next();
+        mat_b_TCDM = mat_a_TCDM + elems * elems;
+        dst_TCDM = mat_b_TCDM + elems * elems;
 
-        if (!mat_a || !mat_b || !dst) {
+        if (!mat_a_TCDM || !mat_b_TCDM || !dst_TCDM) {
             printf("Memory allocation failed!\n");
             return -1;
         }
 
-        /* deterministic init */
-        for (uint32_t i = 0; i < elems * elems; ++i) mat_a[i] = (float)i;
-        for (uint32_t i = 0; i < elems * elems; ++i) mat_b[i] = (float)i;
+        size_t size = elems * elems * sizeof(float);
+
+        snrt_dma_start_1d(mat_a_TCDM, mat_a, size);
+        snrt_dma_start_1d(mat_b_TCDM, mat_b, size);
+        snrt_dma_start_1d(dst_TCDM, golden, size);
+        snrt_dma_wait_all();
     }
 
     snrt_cluster_hw_barrier();
@@ -71,39 +74,26 @@ int main() {
         }
 
         if(use_opt==1) 
-            matrix_mul_opt(chunk_per_core,offset, mat_a, mat_b, dst);
+            matrix_mul_opt(chunk_per_core,offset, mat_a_TCDM, mat_b_TCDM, dst_TCDM);
         else
-            matmul_simple_f32(chunk_per_core,offset, mat_a, mat_b, dst);
+            matmul_simple_f32(chunk_per_core,offset, mat_a_TCDM, mat_b_TCDM, dst_TCDM);
 
     }
 
     snrt_cluster_hw_barrier();
 
-    if (PRINT_RESULTS == 1 && core_idx == 0) {
+    uint32_t err = 0;
+    float eps = 1e-5;
 
-       // Print all results, not recommended for matrices larger than 8x8
-        if(elems == 8){
-
-            for(uint32_t i=0; i<elems; i++){
-                printf("Row %d: ", i);
-                for(uint32_t j=0; j<elems;j++){
-
-                    printf("%.1f; ",dst[i*elems + j]);
-
-                }
-                printf("\n");
-            }
-        }   // Print results for sanity check
-        else{
-            for(uint32_t i=0; i<7; i++){ // first eight elements of first row
-                printf("mat_mul(0,%d): %.2f\n",i, dst[i]);
-            }
-            // first eight elements of last row
-            for(uint32_t i=0; i<7; i++){
-                printf("mat_mul(%d, %d): %.2f\n",elems-1,i, dst[elems*(elems-1)+i]);
+    if (CHECK_RESULTS == 1 && core_idx == 0) {
+        asm("nop \n");
+        for(uint32_t i = 0; i < elems * elems; i++){
+            if(fabs(dst_TCDM[i] - golden[i]) > eps){
+                err ++;
             }
         }
+        printf("Errors: %u\n", err);
     }
 
-    return 0;
+    return err;
 }
