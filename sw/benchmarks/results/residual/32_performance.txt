@@ -1,0 +1,18 @@
+Kernel: residual
+Elements: 32
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     198        0.748    0.0000          0.6465         
+1     230        0.643    0.0000          0.5565         
+2     237        0.625    0.0000          0.5401         
+3     231        0.641    0.0000          0.5541         
+4     257        0.576    0.0000          0.4981         
+5     230        0.643    0.0000          0.5565         
+6     246        0.602    0.0000          0.5203         
+7     242        0.612    0.0000          0.5289         
+
+Cluster average:
+Cycles            : 233.88
+IPC               : 0.636
+FLOPs_alg/cycle   : 0.0000
+FLOPs_sust/cycle  : 0.5501

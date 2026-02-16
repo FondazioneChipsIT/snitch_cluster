@@ -1,0 +1,18 @@
+Kernel: matmul_naive
+Elements: 8
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     446        0.475    0.2870          0.2870         
+1     437        0.485    0.2929          0.2929         
+2     451        0.470    0.2838          0.2838         
+3     445        0.476    0.2876          0.2876         
+4     445        0.476    0.2876          0.2876         
+5     438        0.484    0.2922          0.2922         
+6     445        0.476    0.2876          0.2876         
+7     442        0.480    0.2896          0.2896         
+
+Cluster average:
+Cycles            : 443.62
+IPC               : 0.478
+FLOPs_alg/cycle   : 0.2886
+FLOPs_sust/cycle  : 0.2886

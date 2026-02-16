@@ -1,0 +1,18 @@
+Kernel: DWT_32
+Elements: 16
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     64         0.766    0.0625          0.1250         
+1     74         0.716    0.1622          0.2162         
+2     90         0.633    0.2222          0.2667         
+3     106        0.576    0.2642          0.3019         
+4     122        0.533    0.2951          0.3279         
+5     138        0.500    0.3188          0.3478         
+6     154        0.474    0.3377          0.3636         
+7     170        0.453    0.3529          0.3765         
+
+Cluster average:
+Cycles            : 114.75
+IPC               : 0.581
+FLOPs_alg/cycle   : 0.2519
+FLOPs_sust/cycle  : 0.2907

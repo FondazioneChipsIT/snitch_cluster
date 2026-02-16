@@ -73,7 +73,16 @@ SN_BUILD_APPS ?= ON
 
 ifeq ($(SN_BUILD_APPS), ON)
 # Benhmarks
-SN_APPS += $(SN_ROOT)/sw/benchmarks/matmul_fp32
+# DSP kernels
+SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/CONV3x3
+SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/DWT
+SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/FFT
+SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/FIR
+SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/kmeans_b
+# LLM kernels
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/matmul_fp32
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/residual
+
 endif
 
 # Include Makefile from each app subdirectory

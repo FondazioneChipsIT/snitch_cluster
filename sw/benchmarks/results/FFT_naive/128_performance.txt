@@ -1,0 +1,18 @@
+Kernel: FFT_naive
+Elements: 128
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     2854       0.869    0.0785          0.3588         
+1     2863       0.866    0.0782          0.3130         
+2     2879       0.861    0.0778          0.3112         
+3     2858       0.868    0.0784          0.3135         
+4     2893       0.857    0.0774          0.3097         
+5     2878       0.862    0.0778          0.3113         
+6     2887       0.859    0.0776          0.3104         
+7     2882       0.861    0.0777          0.3109         
+
+Cluster average:
+Cycles            : 2874.25
+IPC               : 0.863
+FLOPs_alg/cycle   : 0.0779
+FLOPs_sust/cycle  : 0.3173
