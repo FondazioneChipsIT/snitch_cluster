@@ -1,6 +1,6 @@
 APP              := matmul_fp32
-$(APP)_BUILD_DIR ?= $(SN_ROOT)/sw/benchmarks/LLM/$(APP)/build
-SRC_DIR          := $(SN_ROOT)/sw/benchmarks/LLM/$(APP)/src
-SRCS             := $(SRC_DIR)/$(APP).c
+$(APP)_BUILD_DIR := $(SN_ROOT)/sw/benchmarks/LLM/$(APP)/build
+SRCS             := $(SN_ROOT)/sw/benchmarks/LLM/$(APP)/src/$(APP).c
+$(APP)_INCDIRS   := $(SN_ROOT)/sw/benchmarks/LLM/$(APP)/data
 
 include $(SN_ROOT)/sw/kernels/common.mk

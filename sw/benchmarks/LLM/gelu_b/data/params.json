@@ -4,5 +4,5 @@
 
 {
     size: 64,
-    prec: "FP64"
+    prec: "FP32"
 }

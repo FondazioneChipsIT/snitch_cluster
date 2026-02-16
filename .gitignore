@@ -35,3 +35,4 @@ gmon.out
 #logs
 /logs/
 logs/
+/sw/dumps/
