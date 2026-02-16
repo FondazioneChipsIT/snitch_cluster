@@ -31,3 +31,6 @@ gmon.out
 
 #Virtual environments
 /my_env/
+
+#logs
+/logs/
