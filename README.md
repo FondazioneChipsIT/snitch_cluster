@@ -7,95 +7,79 @@ Create a new cfg file in the /cfg folder. Change the DataWidth to 32 bits, remov
 Then, change the Start.s file found in the sw/runtime/src folder. This file is used to boot Snitch, putting to zero all the registers. The original file uses a FP64 instruction to do so. Change all the lines that use "fcvt.d.w" to "fcvt.s.w". This will allow Snitch to boot avoiding bootloops that would be otherwise cause by the exeptions.
 
 # How to setup the software for FP32
-Prerequisiti
 
-LLVM/Clang già compilato con supporto RISC-V e lld abilitato
-Se devi ricompilare LLVM da zero:
+Clone the llvm project and build it:
+- `cd /path/to/llvm-project`
+- `mkdir build-llvm && cd build-llvm`
 
-bashcd /path/to/llvm-project
-mkdir build-llvm && cd build-llvm
-
-cmake ../llvm \
-  -G "Unix Makefiles" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DLLVM_ENABLE_PROJECTS="clang;lld" \
-  -DLLVM_TARGETS_TO_BUILD="RISCV;X86" \
-  -DCMAKE_INSTALL_PREFIX=/path/to/llvm-install
-
-make -j$(nproc)
-make install
-
-Step 1: Verifica che lld sia disponibile
-bashls /path/to/llvm-install/bin/ld.lld
-Se non c'è, torna ai prerequisiti e ricompila LLVM con -DLLVM_ENABLE_PROJECTS="clang;lld".
-
-Step 2: Crea e pulisci la build directory
-bashmkdir -p /path/to/llvm-project/build-compiler-rt
-cd /path/to/llvm-project/build-compiler-rt
-rm -rf *
-
-Step 3: Configura con CMake
-bashcmake ../compiler-rt \
-  -G "Unix Makefiles" \
-  -DCMAKE_C_COMPILER=/path/to/llvm-install/bin/clang \
-  -DCMAKE_CXX_COMPILER=/path/to/llvm-install/bin/clang++ \
-  -DCMAKE_AR=/path/to/llvm-install/bin/llvm-ar \
-  -DCMAKE_NM=/path/to/llvm-install/bin/llvm-nm \
-  -DCMAKE_RANLIB=/path/to/llvm-install/bin/llvm-ranlib \
-  \
-  -DCMAKE_C_FLAGS="--target=riscv32-unknown-elf -march=rv32imf -mabi=ilp32f -mcmodel=medany" \
-  -DCMAKE_CXX_FLAGS="--target=riscv32-unknown-elf -march=rv32imf -mabi=ilp32f -mcmodel=medany" \
-  -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
-  -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" \
-  -DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=lld" \
-  \
-  -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
-  \
-  -DCOMPILER_RT_BAREMETAL_BUILD=ON \
-  -DCOMPILER_RT_BUILD_BUILTINS=ON \
-  -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-  -DCOMPILER_RT_BUILD_MEMPROF=OFF \
-  -DCOMPILER_RT_BUILD_PROFILE=OFF \
-  -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-  -DCOMPILER_RT_BUILD_XRAY=OFF \
-  \
-  -DCOMPILER_RT_DEFAULT_TARGET_ONLY=OFF \
-  -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE=riscv32-unknown-elf \
-  \
-  -DLLVM_CONFIG_PATH=/path/to/llvm-install/bin/llvm-config \
-  -DCMAKE_INSTALL_PREFIX=/path/to/llvm-install
-
-Note:
-
--DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY evita che CMake tenti il linking durante il check del compilatore, bypassando il problema con il system ld che non supporta RISC-V.
--DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" forza l'uso di lld invece del system ld.
--DCOMPILER_RT_DEFAULT_TARGET_ONLY=OFF è necessario quando si specifica un triple esplicito.
+- `cmake ../llvm \`
+  `-G "Unix Makefiles" \`
+  `-DCMAKE_BUILD_TYPE=Release \`
+  `-DLLVM_ENABLE_PROJECTS="clang;lld" \`
+  `-DLLVM_TARGETS_TO_BUILD="RISCV;X86" \`
+  `-DCMAKE_INSTALL_PREFIX=/path/to/llvm-install`
 
 
+- `make -j$(nproc)`
+- `make install`
 
-Step 4: Compila e installa
-bashmake -j$(nproc)
-make install
+Verify that you have lld
+-`ls /path/to/llvm-install/bin/ld.lld`
+Otherwise recompile  LLVM with `-DLLVM_ENABLE_PROJECTS="clang;lld"`.
 
-Step 5: Crea il symlink
-Clang cerca la libreria in lib/clang/<versione>/lib/, ma compiler-rt la installa in lib/linux/. Bisogna creare un symlink:
-bash# Verifica dove è stata installata la libreria
-find /path/to/llvm-install -name "libclang_rt.builtins*"
+Create compiler-rt
+- `mkdir -p /path/to/llvm-project/build-compiler-rt`
+- `cd /path/to/llvm-project/build-compiler-rt`
+- `rm -rf *`
 
-# Crea la directory target
-mkdir -p /path/to/llvm-install/lib/clang/<versione>/lib
+Configure  CMake
+- `bashcmake ../compiler-rt \`
+  `-G "Unix Makefiles" \`
+  `-DCMAKE_C_COMPILER=/path/to/llvm-install/bin/clang \`
+  `-DCMAKE_CXX_COMPILER=/path/to/llvm-install/bin/clang++ \`
+  `-DCMAKE_AR=/path/to/llvm-install/bin/llvm-ar \`
+  `-DCMAKE_NM=/path/to/llvm-install/bin/llvm-nm \`
+  `-DCMAKE_RANLIB=/path/to/llvm-install/bin/llvm-ranlib \`
+  `\`
+  `-DCMAKE_C_FLAGS="--target=riscv32-unknown-elf -march=rv32imf -mabi=ilp32f -mcmodel=medany" \`
+  `-DCMAKE_CXX_FLAGS="--target=riscv32-unknown-elf -march=rv32imf -mabi=ilp32f -mcmodel=medany" \`
+  `-DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \`
+  `-DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" \`
+  `-DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=lld" \`
+  `\`
+  `-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \`
+  `\`
+  `-DCOMPILER_RT_BAREMETAL_BUILD=ON \`
+  `-DCOMPILER_RT_BUILD_BUILTINS=ON \`
+  `-DCOMPILER_RT_BUILD_LIBFUZZER=OFF \`
+  `-DCOMPILER_RT_BUILD_MEMPROF=OFF \`
+  `-DCOMPILER_RT_BUILD_PROFILE=OFF \`
+  `-DCOMPILER_RT_BUILD_SANITIZERS=OFF \`
+  `-DCOMPILER_RT_BUILD_XRAY=OFF \`
+  `\`
+  `-DCOMPILER_RT_DEFAULT_TARGET_ONLY=OFF \`
+  `-DCOMPILER_RT_DEFAULT_TARGET_TRIPLE=riscv32-unknown-elf \`
+  `\`
+  `-DLLVM_CONFIG_PATH=/path/to/llvm-install/bin/llvm-config \`
+  `-DCMAKE_INSTALL_PREFIX=/path/to/llvm-install`
 
-# Crea il symlink
-ln -s /path/to/llvm-install/lib/linux/libclang_rt.builtins-riscv32.a \
-      /path/to/llvm-install/lib/clang/<versione>/lib/libclang_rt.builtins-riscv32.a
-Sostituisci <versione> con la versione effettiva di clang (es. 15.0.0), che puoi trovare con:
-bash/path/to/llvm-install/bin/clang --version
+- `make -j$(nproc)`
+- `make install`
 
-Step 6: Verifica finale
-bashls /path/to/llvm-install/lib/clang/<versione>/lib/libclang_rt.builtins-riscv32.a
-A questo punto il toolchain è pronto per compilare programmi bare-metal per riscv32-unknown-elf.
+Create a symlink
 
-Attenzione: Se in futuro reinstalli o aggiorni il toolchain, il symlink andrà ricreato manualmente.
+- `find /path/to/llvm-install -name "libclang_rt.builtins*"`
+
+ -`mkdir -p /path/to/llvm-install/lib/clang/<versione>/lib`
+
+
+-`ln -s /path/to/llvm-install/lib/linux/libclang_rt.builtins-riscv32.a path/to/llvm-install/lib/clang/<versione>/lib/libclang_rt.builtins-riscv32.a`
+
+Verify
+- `ls /path/to/llvm-install/lib/clang/<versione>/lib/libclang_rt.builtins-riscv32.a`
+
+Change in the toolchain.mk the path to the LLVM. Also in sw.mk.
+
 
 # Snitch Cluster
 
