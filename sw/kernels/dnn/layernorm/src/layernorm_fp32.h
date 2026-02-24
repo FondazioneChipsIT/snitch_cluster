@@ -31,12 +31,12 @@ static inline void layernorm_naive(T *input, T *output, int32_t batch_size,
         uint32_t batch_offset = seq_len * embeddings;
 
         // compute the mean and variance along the last dimension
-        float mean = 0.0;  // max value of the current core
-        float var = 0.0;   // sum of the exp values of the current core
+        float mean = 0.0f;  // max value of the current core
+        float var = 0.0f;   // sum of the exp values of the current core
         for (int32_t b = 0; b < batch_size; b++) {
             for (int32_t s = 0; s < tile_seq_len; s++) {
-                mean = 0.0;
-                var = 0.0;
+                mean = 0.0f;
+                var = 0.0f;
 
                 for (int32_t i = 0; i < embeddings; i++) {
                     mean += core_itile[b * batch_offset + s * stride + i];
@@ -77,9 +77,9 @@ static inline void layernorm_fp32_opt(float *input, float *output,
         uint32_t batch_offset = seq_len * embeddings;
 
         // compute the mean and variance along the last dimension
-        float mean_tot = 0.0;  // max value of the current core
-        float var_tot = 0.0;   // sum of the exp values of the current core
-        v2f32 mean_reg = {0.0, 0.0};
+        float mean_tot = 0.0f;  // max value of the current core
+        float var_tot = 0.0f;   // sum of the exp values of the current core
+        v2f32 mean_reg = {0.0f, 0.0f};
         const int num_elems_per_vector = sizeof(double) / sizeof(float);
         for (int32_t b = 0; b < batch_size; b++) {
             const uint32_t ssr0_b[4] = {
@@ -114,15 +114,15 @@ static inline void layernorm_fp32_opt(float *input, float *output,
                 embeddings / (UNROLL * num_elems_per_vector);
 
             for (int32_t s = 0; s < tile_seq_len; s++) {
-                float mean[UNROLL] = {0.0, 0.0};
-                float var[UNROLL] = {0.0, 0.0};
-                mean_tot = 0.0;
-                var_tot = 0.0;
+                float mean[UNROLL] = {0.0f, 0.0f};
+                float var[UNROLL] = {0.0f, 0.0f};
+                mean_tot = 0.0f;
+                var_tot = 0.0f;
                 v2f32 var_reg[UNROLL];
                 v2f32 pow[UNROLL];
                 v2f32 one_reg = {1.0f, 1.0f};
 
-                var_tot = 0.0;
+                var_tot = 0.0f;
                 snrt_ssr_enable();
                 // Computation of the row mean
                 asm volatile(
@@ -142,7 +142,7 @@ static inline void layernorm_fp32_opt(float *input, float *output,
                     : [ mean0 ] "+f"(mean[0]), [ mean1 ] "+f"(mean[1]),
                       [ mean2 ] "+f"(mean[2]), [ mean3 ] "+f"(mean[3]),
                       [ mean_tot ] "+f"(mean_tot)
-                    : [ n_frep ] "r"(n_frep - 1), [ zero ] "f"(0.0),
+                    : [ n_frep ] "r"(n_frep - 1), [ zero ] "f"(0.0f),
                       [ embeddings ] "f"((float)embeddings)
                     : "ft0", "ft1", "ft2");
 
@@ -188,7 +188,7 @@ static inline void layernorm_fp32_opt(float *input, float *output,
                       [ mean_reg ] "+f"(mean_reg)
                     : [ n_frep ] "r"(n_frep - 1), [ mean_tot ] "f"(mean_tot),
                       [ embeddings ] "f"((float)embeddings),
-                      [ eps ] "f"((float)eps), [ zero ] "f"(0.0),
+                      [ eps ] "f"((float)eps), [ zero ] "f"(0.0f),
                       [ one_reg ] "f"(one_reg)
                     : "ft0", "ft1", "ft2"
 

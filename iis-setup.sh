@@ -10,7 +10,7 @@ export SN_BENDER=bender
 export SN_VCS_SEPP=
 export SN_VERILATOR_SEPP=
 export SN_QUESTA_SEPP=
-export SN_LLVM_BINROOT=/opt/riscv/snitch-llvm-15.0.0-snitch-0.2.0/bin
+export SN_LLVM_BINROOT=/data/luca.colombo/llvm-snitch-32/bin
 
 # Create Python virtual environment with required packages
 #python3.11 -m venv .venv

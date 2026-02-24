@@ -10,7 +10,7 @@
 ###################
 
 # Compiler toolchain
-SN_LLVM_BINROOT  ?= $(dir $(shell which riscv32-unknown-elf-clang))
+SN_LLVM_BINROOT  ?= /data/luca.colombo/llvm-snitch-32/bin
 SN_RISCV_CC      ?= $(SN_LLVM_BINROOT)/clang
 SN_RISCV_CXX     ?= $(SN_LLVM_BINROOT)/clang++
 SN_RISCV_LD      ?= $(SN_LLVM_BINROOT)/ld.lld
@@ -21,7 +21,8 @@ SN_RISCV_OBJDUMP ?= $(SN_LLVM_BINROOT)/llvm-objdump
 # Compiler flags
 SN_RISCV_CFLAGS := -mcpu=snitch
 SN_RISCV_CFLAGS += -menable-experimental-extensions
-SN_RISCV_CFLAGS += -mabi=ilp32d
+SN_RISCV_CFLAGS += -march=rv32imaf_xdma_xssr
+SN_RISCV_CFLAGS += -mabi=ilp32f
 SN_RISCV_CFLAGS += -mcmodel=medany
 SN_RISCV_CFLAGS += -mno-fdiv
 SN_RISCV_CFLAGS += -fno-builtin-printf
@@ -31,6 +32,7 @@ SN_RISCV_CFLAGS += -fopenmp
 SN_RISCV_CFLAGS += -ftls-model=local-exec
 SN_RISCV_CFLAGS += -O3
 SN_RISCV_CFLAGS += -Werror
+SN_RISCV_CFLAGS += -Wno-unused-command-line-argument
 ifeq ($(DEBUG), ON)
 SN_RISCV_CFLAGS += -g
 endif

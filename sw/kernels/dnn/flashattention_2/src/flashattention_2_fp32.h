@@ -180,7 +180,7 @@ static inline void flashattention_2_fp32(flashattention_2_layer_t layer) {
                     m_i_prev[row_idx] = m_i[row_idx];
 
                     // Initialize "local" row_sum to zero
-                    row_sum = 0.0;
+                    row_sum =  0.0f;
 
                     // Iterate over all columns to calculate maximum for the
                     // current row

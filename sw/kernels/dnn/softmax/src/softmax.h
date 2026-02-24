@@ -40,13 +40,13 @@ typedef struct softmax_layer_struct {
 static inline void softmax_fp32(float *input, float *output, int32_t ldI,
                                 int32_t batch_offset, int32_t batch_size,
                                 int32_t seq_len, int32_t input_samples) {
-    float max_core = 0.0;  // max value of the current core
-    float sum = 0.0;       // sum of the exp values of the current core
+    float max_core = 0.0f;  // max value of the current core
+    float sum = 0.0f;       // sum of the exp values of the current core
     snrt_mcycle();
     for (int32_t b = 0; b < batch_size; b++) {
         for (int32_t s = 0; s < seq_len; s++) {
             max_core = -INFINITY;
-            sum = 0.0;
+            sum = 0.0f;
 
             for (int32_t i = 0; i < input_samples; i++) {
                 if (input[b * batch_offset + s * ldI + i] > max_core) {
