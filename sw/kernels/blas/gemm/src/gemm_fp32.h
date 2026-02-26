@@ -159,8 +159,8 @@ void gemm_fp32_baseline(uint32_t setup_ssr, uint32_t partition_banks,
             volatile v2f32 *a_ptr, *b_ptr;
             v2f32 a, b;
             volatile float* c_ptr;
-            const float zero = 0.0;
-            double c = 0.0;
+            const float zero = 0.0f;
+            double c = 0.0f;
             v2f32 reduce_reg;
 
             a_ptr = (v2f32*)(&A[m * lda]);
@@ -253,7 +253,7 @@ void gemm_fp32_opt(uint32_t setup_ssr, uint32_t partition_banks,
         uint32_t n = 0;
         for (uint32_t n0 = 0; n0 < N / unroll; n0++) {
             float* _C = &C[m * ldc + n / 2];
-            const float zero = 0.0;
+            const float zero = 0.0f;
             v2f32 c[unroll], reduce_reg[unroll];
 
             asm volatile(
@@ -350,7 +350,7 @@ void gemm_fp32_opt(uint32_t setup_ssr, uint32_t partition_banks,
         snrt_ssr_disable();
 
         for (; n < N; n++) {
-            float c = beta ? C[m * ldc + n] : 0.0;
+            float c = beta ? C[m * ldc + n] : 0.0f;
             for (uint32_t k = 0; k < K; k++) {
                 c += A[k + m * lda] * B[k + n * ldb];
             }

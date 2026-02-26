@@ -122,11 +122,11 @@ static inline void allocate_buffers(uint32_t size_a, uint32_t size_b,
                                          banks_per_buffer, size_c));
         }
     } else {
-        b_addr[0] = snrt_align_up(a_addr[0] + size_a, sizeof(double));
-        c_addr[0] = snrt_align_up(b_addr[0] + size_b, sizeof(double));
-        a_addr[1] = snrt_align_up(c_addr[0] + size_c, sizeof(double));
-        b_addr[1] = snrt_align_up(a_addr[1] + size_a, sizeof(double));
-        c_addr[1] = snrt_align_up(b_addr[1] + size_b, sizeof(double));
+        b_addr[0] = snrt_align_up(a_addr[0] + size_a, sizeof(float));
+        c_addr[0] = snrt_align_up(b_addr[0] + size_b, sizeof(float));
+        a_addr[1] = snrt_align_up(c_addr[0] + size_c, sizeof(float));
+        b_addr[1] = snrt_align_up(a_addr[1] + size_a, sizeof(float));
+        c_addr[1] = snrt_align_up(b_addr[1] + size_b, sizeof(float));
     }
 
     // Allocate
@@ -145,7 +145,7 @@ static inline void allocate_buffers(uint32_t size_a, uint32_t size_b,
         if (largs->double_buffer) lc[1] = (void *)c_addr[1];
     } else
         lc[0] = largs->c;
-    // Note: uses the second C buffer for the reduction phase. Double buffering
+    // Note: uses the second C buffer for the reduction phase. float buffering
     // is not supported when parallelizing K.
     if (largs->parallelize_k) *lcr = (void *)c_addr[1];
 }
@@ -400,7 +400,7 @@ static inline int gemm(const gemm_args_t *args) {
             }
         }
 
-        // Additional barrier required when not double buffering
+        // Additional barrier required when not float buffering
         if (!largs->double_buffer) snrt_cluster_hw_barrier();
 
         // Compute phase
@@ -466,8 +466,8 @@ static inline int gemm(const gemm_args_t *args) {
             if (largs->parallelize_k && (comp_k == (cluster_k_tiles - 1))) {
                 switch (largs->prec) {
                     case FP64:
-                        snrt_global_reduction_dma<double>(
-                            (double *)lcr, (double *)lc[c_buff_idx],
+                        snrt_global_reduction_dma<float>(
+                            (float *)lcr, (float *)lc[c_buff_idx],
                             tile_m * tile_n, comm);
                         break;
                     case FP32:

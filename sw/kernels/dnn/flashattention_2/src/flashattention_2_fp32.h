@@ -114,8 +114,8 @@ static inline void flashattention_2_fp32(flashattention_2_layer_t layer) {
             is_last_compute_core ? B_r : start_row + rows_per_core;
         if (snrt_is_compute_core()) {
             for (int row_idx = start_row; row_idx < end_row; row_idx++) {
-                m_i[row_idx] = -INFINITY;
-                m_i_prev[row_idx] = -INFINITY;
+                m_i[row_idx] = - (float)INFINITY;
+                m_i_prev[row_idx] = - (float)INFINITY;
                 l_i[row_idx] = 0.0f;
             }
         }

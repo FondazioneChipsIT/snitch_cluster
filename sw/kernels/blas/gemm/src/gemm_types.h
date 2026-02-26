@@ -97,7 +97,7 @@ typedef struct {
     uint32_t m;
     uint32_t n;
     uint32_t k;
-    double alpha;
+    float alpha;
     void* a;
     uint32_t lda;
     void* b;
