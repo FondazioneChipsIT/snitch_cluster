@@ -10,7 +10,7 @@
 ###################
 
 # Compiler toolchain
-SN_LLVM_BINROOT  ?= /data/luca.colombo/llvm-snitch-32/bin
+SN_LLVM_BINROOT  ?= $(dir $(shell which riscv32-unknown-elf-clang))
 SN_RISCV_CC      ?= $(SN_LLVM_BINROOT)/clang
 SN_RISCV_CXX     ?= $(SN_LLVM_BINROOT)/clang++
 SN_RISCV_LD      ?= $(SN_LLVM_BINROOT)/ld.lld
@@ -21,8 +21,9 @@ SN_RISCV_OBJDUMP ?= $(SN_LLVM_BINROOT)/llvm-objdump
 # Compiler flags
 SN_RISCV_CFLAGS := -mcpu=snitch
 SN_RISCV_CFLAGS += -menable-experimental-extensions
+# SN_RISCV_CFLAGS += --target=riscv32-unknown-elf
 SN_RISCV_CFLAGS += -march=rv32imaf_xdma_xssr
-SN_RISCV_CFLAGS += -mabi=ilp32f
+SN_RISCV_CFLAGS += -mabi=ilp32d	
 SN_RISCV_CFLAGS += -mcmodel=medany
 SN_RISCV_CFLAGS += -mno-fdiv
 SN_RISCV_CFLAGS += -fno-builtin-printf
@@ -33,6 +34,13 @@ SN_RISCV_CFLAGS += -ftls-model=local-exec
 SN_RISCV_CFLAGS += -O3
 SN_RISCV_CFLAGS += -Werror
 SN_RISCV_CFLAGS += -Wno-unused-command-line-argument
+SN_RISCV_CFLAGS += -ffast-math
+# Use this flag to get warnings about implicit flota to double conversions
+# These conversions can cause to exceptions and boot loops
+# It is by default disabled because it also gives errors about fp16 to float conversions,
+# which do not cause exceptions or issues.
+# SN_RISCV_CFLAGS += -Wdouble-promotion
+
 ifeq ($(DEBUG), ON)
 SN_RISCV_CFLAGS += -g
 endif
@@ -52,3 +60,8 @@ SN_RISCV_ARFLAGS := rcs
 # Objdump flags
 SN_RISCV_OBJDUMP_FLAGS := --mcpu=snitch
 SN_RISCV_OBJDUMP_FLAGS += -D
+
+# Header file in picolibc
+# SN_RISCV_CFLAGS += -isystem /data/luca.colombo/llvm-snitch32/include
+# SN_RISCV_LDFLAGS += -L/data/luca.colombo/llvm-snitch32/lib/
+# SN_RISCV_LDFLAGS += -L/data/luca.colombo/llvm-snitch32/lib/clang/15/lib/linux

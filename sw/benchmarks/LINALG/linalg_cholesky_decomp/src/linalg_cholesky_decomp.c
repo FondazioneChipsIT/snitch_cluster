@@ -41,25 +41,6 @@ int main() {
     else{
 
     }
-
-    // Performance metrics
-    total_cycles[core_idx] = end_cycle[core_idx] - start_cycle[core_idx];
-
-    snrt_cluster_hw_barrier();
-
-    if (core_idx == 0) {
-
-        // Mean performance values
-        uint64_t mean_cycles=0;
-
-        for(uint32_t core_idx = 0; core_idx < ncores; core_idx ++){
-            mean_cycles += total_cycles[core_idx];
-
-        }
-        mean_cycles /= ncores;
-
-        printf("Cholesky decomposition %dx%d performance\n",elems,elems);
-        printf("Mean cycles: %llu\n", (unsigned long long)mean_cycles);
-    }
+    
     return 0;
 }

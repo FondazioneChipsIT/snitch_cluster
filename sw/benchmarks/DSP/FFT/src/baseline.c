@@ -53,7 +53,7 @@ static float *fft_base(uint32_t N, float *x, float *y, float *twiddle) {
 				float d1 = twv_im - twv_im_magic;
 				if (d0 < 0) d0 = -d0;
 				if (d1 < 0) d1 = -d1;
-				if (d0 > 0.001 || d1 > 0.001)
+				if (d0 > 0.001f || d1 > 0.001f)
 					for (;;);
 				asm volatile ("check_done_bro:");
 				// y[(i*is+i0)*s*4+(j*js+j0)*2+0] = u_re + twv_re;

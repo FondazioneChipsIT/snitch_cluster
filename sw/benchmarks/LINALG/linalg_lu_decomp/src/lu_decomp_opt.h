@@ -73,9 +73,9 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
     uint32_t vec_offset = core_idx * elems;
 
     // Zero pivot threshold
-    float eps = 1e-15;
+    float eps = 1e-15f;
 
-    float zero =  0.0;
+    float zero =  0.0f;
 
     /* Load zero into ft5 */
     asm volatile(
@@ -94,13 +94,13 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
 
             /* pivot selection on current column */
             row_max = k;
-            max_val = fabs(mat[k * elems + k]);
+            max_val = fabsf(mat[k * elems + k]);
             
             // Could be optimized with SSRs? 
             // but overhead probably too high for single column
             // and difficult to implement efficiently
             for (uint32_t m = k + 1; m < elems; m++) {
-                float cur = fabs(mat[m * elems + k]);
+                float cur = fabsf(mat[m * elems + k]);
                 if (cur > max_val) { 
                     // This line cannot be optimized with SSRs
                     row_max = m; 
@@ -140,7 +140,7 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
 
         // Each core has its own copy of the pivot row
         float pivot = mat[k * elems + k];
-        float p_inv = 1.0 / pivot;
+        float p_inv = 1.0f / pivot;
 
         if(snrt_is_compute_core()){
         

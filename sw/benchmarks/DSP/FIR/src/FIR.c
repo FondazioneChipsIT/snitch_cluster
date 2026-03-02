@@ -11,7 +11,7 @@ void fir_naive(uint32_t chunk_per_core, uint32_t offset,
     snrt_mcycle();
     for (uint32_t n = offset; n < offset + chunk_per_core; n++) {
 
-        float acc = 0.0;
+        float acc = 0.0f;
 
         /* Gestione del bordo sinistro */
         uint32_t taps = (n < FILTER_LEN) ? (n + 1) : FILTER_LEN;

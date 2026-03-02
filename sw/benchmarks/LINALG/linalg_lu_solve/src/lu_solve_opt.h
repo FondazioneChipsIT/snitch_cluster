@@ -19,7 +19,7 @@ OPT? more like better not to use ssrs in this case
 void lu_solve_opt(uint32_t core_idx, uint32_t ncores, uint64_t *offset_cycle, uint64_t *end_cycle, 
                 float *mat, uint32_t *perm, float *y, float *vec, float *result) {
 
-    float zero = 0.0;
+    float zero = 0.0f;
     uint32_t perm_idx;
 
     // Start cycle count
@@ -85,7 +85,7 @@ void lu_solve_opt(uint32_t core_idx, uint32_t ncores, uint64_t *offset_cycle, ui
 
         // Core 0 sums, not parallelizable
         if (core_idx == 0) {
-            float sum = 0.0;
+            float sum = 0.0f;
             for (uint32_t i = 0; i < ncores; i++)
                 sum += local_sum[i];                          
 
@@ -164,7 +164,7 @@ void lu_solve_opt(uint32_t core_idx, uint32_t ncores, uint64_t *offset_cycle, ui
 
         // Core 0 sums
         if (core_idx == 0) {
-            float sum = 0.0;
+            float sum = 0.0f;
             for (uint32_t i = 0; i < ncores; i++)
                 sum += local_sum[i];
             result[m] = (y[m] - sum) / mat[m * elems + m];

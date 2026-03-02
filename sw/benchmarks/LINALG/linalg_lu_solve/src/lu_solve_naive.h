@@ -35,7 +35,7 @@ void lu_solve_naive(uint64_t *start_cycle, uint64_t *end_cycle,
     for (uint32_t m = 0; m < elems; m++) {
         if(snrt_is_compute_core()){
             // reset buffer
-            local_sum[core_idx] = 0.0;
+            local_sum[core_idx] = 0.0f;
             
 
                 // numero di elementi da sommare: k in [0, m)
@@ -56,7 +56,7 @@ void lu_solve_naive(uint64_t *start_cycle, uint64_t *end_cycle,
 
         // core 0 somma tutte le parti e aggiorna y[m]
         if (core_idx == 0) {
-            float sum = 0.0;
+            float sum = 0.0f;
             for (uint32_t i = 0; i < ncores; i++)
                 sum += local_sum[i];
 

@@ -160,7 +160,7 @@ void gemm_fp32_baseline(uint32_t setup_ssr, uint32_t partition_banks,
             v2f32 a, b;
             volatile float* c_ptr;
             const float zero = 0.0f;
-            double c = 0.0f;
+            float c = 0.0f;
             v2f32 reduce_reg;
 
             a_ptr = (v2f32*)(&A[m * lda]);

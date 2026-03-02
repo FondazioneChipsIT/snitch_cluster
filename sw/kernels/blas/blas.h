@@ -10,11 +10,11 @@
 // - 0f * INFINITY == NaN
 // Thus in order to optimize it, we need to test for zero. You can use this
 // function for free when `multiplier` is a constant.
-static inline double multiply_opt(double multiplicand, double multiplier) {
+static inline float multiply_opt(float multiplicand, float multiplier) {
     if (multiplier)
         return multiplicand * multiplier;
     else
-        return 0;
+        return 0.0f;
 }
 
 #include "axpy/src/axpy.h"

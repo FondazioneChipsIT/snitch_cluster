@@ -23,7 +23,7 @@ void conv3x3_naive(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
 
             for (uint32_t c = 0; c < LEN - 2; c++) {
 
-                float acc = 0.0;
+                float acc = 0.0f;
 
                 // Finestra 3x3
                 for (uint32_t kr = 0; kr < 3; kr++) {

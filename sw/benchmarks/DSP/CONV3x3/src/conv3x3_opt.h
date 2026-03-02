@@ -5,7 +5,7 @@
 void conv3x3_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
     float *x, float *y, float *h){
 
-    float zero = 0.0; 
+    float zero = 0.0f; 
     
     snrt_mcycle();
     // Check if last two cores, for 6 need 2 rows at least and 7 3

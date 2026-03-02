@@ -185,14 +185,14 @@ static inline void flashattention_2_fp32(flashattention_2_layer_t layer) {
                     // Iterate over all columns to calculate maximum for the
                     // current row
                     for (int col_idx = 0; col_idx < B_c; col_idx++) {
-                        float val = S_fa[row_idx * B_c + col_idx];
+                        float val = (float) S_fa[row_idx * B_c + col_idx];
                         if (val > m_i[row_idx]) m_i[row_idx] = val;
                     }
 
                     // Calculate P tile as the "local" softmax of S
                     for (int col_idx = 0; col_idx < B_c; col_idx++) {
                         P_fa[row_idx * B_c + col_idx] =
-                            expf(S_fa[row_idx * B_c + col_idx] - m_i[row_idx]);
+                            expf( (float)S_fa[row_idx * B_c + col_idx] - m_i[row_idx]);
                         row_sum += P_fa[row_idx * B_c + col_idx];
                     }
 

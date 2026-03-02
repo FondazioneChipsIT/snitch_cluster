@@ -12,24 +12,24 @@
 
 // FOR DEBUG PURPOSE
 void lu_solve_serial(float *mat, uint32_t *perm, float *y_ref, float *vec, float *x_ref) {
-    for (uint32_t i=0;i<elems;i++){ y_ref[i] = 0.0; x_ref[i]=0.0; }
+    for (uint32_t i=0;i<elems;i++){ y_ref[i] = 0.0f; x_ref[i]=0.0f; }
 
     printf("=== SERIAL DEBUG FORWARD ===\n");
     for (uint32_t m = 0; m < elems; m++) {
-        float sum = 0.0;
+        float sum = 0.0f;
         for (uint32_t k = 0; k < m; k++) sum += mat[(size_t)m * elems + k] * y_ref[k];
         y_ref[m] = vec[perm[m]] - sum;
-        printf("m=%u: perm=%u vec=%12.6g sum=%12.6g y[%u]=%12.6g\n", m, perm[m], vec[perm[m]], sum, m, y_ref[m]);
+        // printf("m=%u: perm=%u vec=%12.6g sum=%12.6g y[%u]=%12.6g\n", m, perm[m], vec[perm[m]], sum, m, y_ref[m]);
     }
 
     printf("=== SERIAL DEBUG BACKWARD ===\n");
     for (int m = (int)elems - 1; m >= 0; m--) {
-        float sum = 0.0;
+        float sum = 0.0f;
         for (uint32_t k = m+1; k < elems; k++) sum += mat[(size_t)m * elems + k] * x_ref[k];
         float diag = mat[(size_t)m * elems + m];
-        if (diag == 0.0) printf("ZERO DIAG AT m=%d\n", m);
+        if (diag == 0.0f) printf("ZERO DIAG AT m=%d\n", m);
         x_ref[m] = (y_ref[m] - sum) / diag;
-        printf("m=%d: diag=%12.6g sum=%12.6g result[%d]=%12.6g\n", m, diag, sum, m, x_ref[m]);
+        // printf("m=%d: diag=%12.6g sum=%12.6g result[%d]=%12.6g\n", m, diag, sum, m, x_ref[m]);
     }
 }
 
@@ -64,8 +64,8 @@ int main() {
 
         for (uint32_t i=0;i<elems;i++){
             perm_vec[i] = pivots[i]; // Copy the perm
-            vec[i] = i + 1.0; // initialize the know vector
-            result[i] = 0.0;
+            vec[i] = i + 1.0f; // initialize the know vector
+            result[i] = 0.0f;
         }
         
     }
@@ -80,41 +80,5 @@ int main() {
 
     // DEBUG 
     //if(core_idx == 0) lu_solve_serial(mat,perm_vec,y,vec,result);
-
-    // Performance metrics
-    total_cycles[core_idx] = end_cycle[core_idx] - start_cycle[core_idx];
-    flop_cycle[core_idx] = (elems * (2.0 * elems - 1.0)) / (float) total_cycles[core_idx];
-   
-   
-
-    snrt_cluster_hw_barrier();
-
-    if (core_idx == 0) {
-
-        // Mean performance values
-        uint64_t mean_cycles=0;
-        float mean_flop_cycle = 0.0;
-        float total_flop_cycle = 0.0;
-
-        for(uint32_t core_idx = 0; core_idx < ncores; core_idx ++){
-            mean_cycles += total_cycles[core_idx];
-            total_flop_cycle += flop_cycle[core_idx];
-        }
-        mean_cycles /= ncores;
-        mean_flop_cycle = total_flop_cycle/ncores;
-
-        printf("Lu solve %dx%d performance\n",elems,elems);
-        printf("Mean cycles: %llu\n", (unsigned long long)mean_cycles);
-        printf("Mean FLOP/cycle: %f\n", mean_flop_cycle);
-        printf("Total FLOP/cycle: %f\n", total_flop_cycle);
-
-        /* print result
-        printf("Result: ");
-        for (uint32_t i=0;i<elems;i++) printf("%f ", result[i]);
-        printf(".\n");*/
-
-    }
-
-
     return 0;
 }

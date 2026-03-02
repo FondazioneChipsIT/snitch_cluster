@@ -52,11 +52,11 @@ int main() {
 
 	// Check against golden model
 	if (core_id == 0) {
-		float eps = 0.01;
+		float eps = 0.01f;
 		uint32_t diffs = 0;
 		for (uint32_t i = 0; i < FFT_N; i++) {
 			float d = y[i] - output[i];
-			d = fabs(d);
+			d = fabsf(d);
 			//printf("Index %d: Computed %f, Golden %f, Diff %f\n", i, y[i], output[i], d);
 			diffs += d > eps;
 		}

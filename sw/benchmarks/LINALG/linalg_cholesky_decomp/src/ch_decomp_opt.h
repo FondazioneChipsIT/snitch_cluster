@@ -15,7 +15,7 @@ void ch_decomp_opt(uint32_t core_idx, uint32_t ncores,
         uint32_t end = start + block + (core_idx < left ? 1 : 0);
 
         if (snrt_is_compute_core()) {
-            local_sum[core_idx] = 0.0;
+            local_sum[core_idx] = 0.0f;
             for (uint32_t n = start; n < end; n++) {
                 float x = dst[m*dim + n];
                 local_sum[core_idx] += x * x;
@@ -25,10 +25,10 @@ void ch_decomp_opt(uint32_t core_idx, uint32_t ncores,
         snrt_cluster_hw_barrier();
 
         if (core_idx == 0) {
-            float sum = 0.0;
+            float sum = 0.0f;
             for (uint32_t c = 0; c < ncores; c++)
                 sum += local_sum[c];
-            dst[m*dim + m] = sqrt(dst[m*dim + m] - sum);
+            dst[m*dim + m] = sqrtf(dst[m*dim + m] - sum);
         }
 
         snrt_cluster_hw_barrier();
@@ -36,7 +36,7 @@ void ch_decomp_opt(uint32_t core_idx, uint32_t ncores,
         if (snrt_is_compute_core()) {
             /* === Column update === */
             float lmm = dst[m*dim + m];
-            float lmm_inv = 1.0 / lmm;
+            float lmm_inv = 1.0f / (float) lmm;
 
             uint32_t col_left = (dim - (m + 1)) % ncores;
             uint32_t col_block = (dim - (m + 1)) / ncores;
@@ -52,7 +52,7 @@ void ch_decomp_opt(uint32_t core_idx, uint32_t ncores,
                     : "ft3");
                 // Avoid doing frep 64K times, maybe it is good!
                 if(m>0){
-                      snrt_ssr_loop_1d(SNRT_SSR_DM0, m, sizeof(float));
+                    snrt_ssr_loop_1d(SNRT_SSR_DM0, m, sizeof(float));
                     snrt_ssr_loop_1d(SNRT_SSR_DM1, m, sizeof(float));
 
                     snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, dst + n*dim);
@@ -79,7 +79,7 @@ void ch_decomp_opt(uint32_t core_idx, uint32_t ncores,
 
                    
                 }
-                dst[n*dim + m] = (src[n*dim + m] - sum1) * lmm_inv;
+                dst[n*dim + m] = (float) (src[n*dim + m] - sum1) * (float) lmm_inv;
             }
 
         }

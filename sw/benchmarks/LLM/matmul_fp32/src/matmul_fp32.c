@@ -83,12 +83,12 @@ int main() {
     snrt_cluster_hw_barrier();
 
     uint32_t err = 0;
-    float eps = 1e-5;
+    float eps = 1e-5f;
 
     if (CHECK_RESULTS == 1 && core_idx == 0) {
         asm("nop \n");
         for(uint32_t i = 0; i < elems * elems; i++){
-            if(fabs(dst_TCDM[i] - golden[i]) > eps){
+            if(fabsf(dst_TCDM[i] - golden[i]) > eps){
                 err ++;
             }
         }

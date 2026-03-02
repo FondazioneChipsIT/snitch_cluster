@@ -53,10 +53,10 @@ void lu_decomp_naive(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, 
         if(core_idx == 0){
             /* pivot selection on current column */
             uint32_t row_max = k;
-            float max_val = fabs(mat[k * elems + k]);
+            float max_val = fabsf(mat[k * elems + k]);
             
             for (uint32_t m = k + 1; m < elems; m++) {
-                float cur = fabs(mat[m * elems + k]);
+                float cur = fabsf(mat[m * elems + k]);
                 if (cur > max_val) { 
                     row_max = m; 
                     max_val = cur;
@@ -64,7 +64,7 @@ void lu_decomp_naive(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, 
             }
 
             // Check for zero pivot
-            if (max_val < 1e-12) {
+            if (max_val < 1e-12f) {
                 printf("ERROR: zero pivot at k=%u\n", (unsigned)k);
                 *end_cycle = snrt_mcycle();
                 return;
@@ -82,7 +82,7 @@ void lu_decomp_naive(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, 
     
         snrt_cluster_hw_barrier();
         float pivot = mat[k * elems + k];
-        float p_inv = 1.0 / pivot;
+        float p_inv = 1.0f / pivot;
 
         if(snrt_is_compute_core()){
 

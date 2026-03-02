@@ -4,7 +4,7 @@ void matrix_swap_rows_opt2(uint32_t chunk_per_core, uint32_t offset,
                         float *mat_a, float *row_a, float *row_b,
                         uint32_t indx_a, uint32_t indx_b){
 
-    float zero = 0.0;
+    float zero = 0.0f;
 
     // Setup the 1d loop with ssr (tell which streams to use, the size and the size of
     // the elements)

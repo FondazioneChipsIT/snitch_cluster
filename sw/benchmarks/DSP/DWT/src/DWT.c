@@ -18,8 +18,8 @@ void dwt_naive(uint32_t chunk_per_core, uint32_t offset,
         /* Numero di tap effettivi (gestione bordo sinistro) */
         uint32_t taps = (center < FILTER_LEN) ? (center + 1) : FILTER_LEN;
 
-        float acc_low  = 0.0;
-        float acc_high = 0.0;
+        float acc_low  = 0.0f;
+        float acc_high = 0.0f;
 
         /*
          * Convoluzione:
@@ -91,7 +91,7 @@ int main(){
         
         // High pass
         for (int k = 0; k < 32; k++) {
-            g[k] = ((k & 1) ? -1.0 : 1.0) * h[31 - k];
+            g[k] = ((k & 1) ? -1.0f : 1.0f) * h[31 - k];
         }
 
 
@@ -114,37 +114,8 @@ int main(){
             dwt_naive(chunk_per_core, offset, x, y_low, y_high, h, g);
     }
 
-    snrt_cluster_hw_barrier(); // Barrier syncronization
-
-    // Check correctnes of results
-    if(core_idx==0){
-
-        float energy_x = 0, energy_y = 0;
-        // Db4 check
-        /* Skip the first truncated
-        for(uint32_t i=FILTER_LEN;i<LEN;i++)
-            energy_x += x[i]*x[i];
-
-        for(uint32_t i=FILTER_LEN;i<LEN/2;i++)
-            energy_y += y_low[i]*y_low[i] + y_high[i]*y_high[i];
-
-        float eps = 1e-9;
-        if (fabs(energy_x - energy_y) > eps * energy_x) {
-            printf("Energy mismatch!\n");
-            return 22;
-        }*/
-
-        // Haar check
-        /*for(uint32_t i=0;i<20;i++){
-
-            printf("Y_low %d, %f\n",i,y_low[i]);
-
-            printf("Y_high %d, %f\n",i,y_high[i]);
-        }*/
-    }
 
 
     return 0;
 }
 
-/* NEVER USE FLOAT TYPE! BREAKS EVERYTHING! */

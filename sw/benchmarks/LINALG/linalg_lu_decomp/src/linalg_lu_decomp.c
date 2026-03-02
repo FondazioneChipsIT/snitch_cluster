@@ -52,42 +52,6 @@ int main() {
     else
         lu_decomp_naive(core_idx, ncores, &start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec);
 
-    // Performance metrics
-    total_cycles[core_idx] = end_cycle[core_idx] - start_cycle[core_idx];
-    // FLOP count: (2/3*n^3) + 2*n*swap_rows_times
-    flop_cycle[core_idx] = ((2.0/3.0*elems*elems*elems) + 2*elems*swap_rows_times)/(float)total_cycles[core_idx];
-
-    snrt_cluster_hw_barrier();
-
-    if (core_idx == 0) {
-
-        // Mean performance values
-        uint64_t mean_cycles=0;
-        float mean_flop_cycle = 0.0;
-        float total_flop_cycle = 0.0;
-
-        for(uint32_t core_idx = 0; core_idx < ncores; core_idx ++){
-            mean_cycles += total_cycles[core_idx];
-            total_flop_cycle += flop_cycle[core_idx];
-        }
-        mean_cycles /= ncores;
-        mean_flop_cycle = total_flop_cycle/ncores;
-
-        printf("LU decomposition %dx%d performance\n",elems,elems);
-        printf("Mean cycles: %llu\n", (unsigned long long)mean_cycles);
-        printf("Mean FLOP/cycle: %f\n", mean_flop_cycle);
-        printf("Total FLOP/cycle: %f\n", total_flop_cycle);
-
-        /* print perm_vec */
-        printf("perm_vec: ");
-        for (uint32_t i=0;i<elems;i++) printf("%d ", perm_vec[i]);
-        printf("\n");
-
-        /* verify, will give warnings for sqrt! */
-        if(verify_results == 1)
-            verify_lu(orig_buf, mat, perm_vec, elems);
-    }
-
 
     return 0;
 }
