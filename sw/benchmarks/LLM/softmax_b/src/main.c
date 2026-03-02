@@ -9,6 +9,8 @@
 #include "data.h"
 
 int main() {
+
     softmax_layer(layer);
+
     return 0;
 }

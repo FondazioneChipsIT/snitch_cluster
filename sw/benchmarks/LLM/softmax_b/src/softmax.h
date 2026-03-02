@@ -40,8 +40,8 @@ typedef struct softmax_layer_struct {
 static inline void softmax_fp32(float *input, float *output, int32_t ldI,
                                 int32_t batch_offset, int32_t batch_size,
                                 int32_t seq_len, int32_t input_samples) {
-    float max_core = 0.0;  // max value of the current core
-    float sum = 0.0;       // sum of the exp values of the current core
+    float max_core = 0.0f;  // max value of the current core
+    float sum = 0.0f;       // sum of the exp values of the current core
 
     uint32_t core_idx = snrt_cluster_core_idx();
     start_cycle[core_idx] = snrt_mcycle;
@@ -49,7 +49,7 @@ static inline void softmax_fp32(float *input, float *output, int32_t ldI,
     for (int32_t b = 0; b < batch_size; b++) {
         for (int32_t s = 0; s < seq_len; s++) {
             max_core = -INFINITY;
-            sum = 0.0;
+            sum = 0.0f;
 
             for (int32_t i = 0; i < input_samples; i++) {
                 if (input[b * batch_offset + s * ldI + i] > max_core) {
@@ -108,7 +108,11 @@ static inline void softmax_layer(softmax_layer_t const l) {
 
     snrt_cluster_hw_barrier();
 
-    if (snrt_is_compute_core()) {
+    if(snrt_is_dm_core()) {
+        return;
+    }
+
+    //if (snrt_is_compute_core()) {
         // determine the row offset for each core
         int32_t row_offset = compute_id * l.input_samples;
 
@@ -122,7 +126,7 @@ static inline void softmax_layer(softmax_layer_t const l) {
         softmax_fp32(&ifmap[row_offset], &ofmap[row_offset], ldI, batch_offset,
                      l.batch_size, l.seq_len / compute_num, l.input_samples);
 
-    } else {
+    /*/} else {
         snrt_cluster_hw_barrier();
     }
 
@@ -136,5 +140,6 @@ static inline void softmax_layer(softmax_layer_t const l) {
         snrt_dma_wait_all();
     }
 
-    snrt_global_barrier();
+    snrt_global_barrier();*/
+    return
 }
