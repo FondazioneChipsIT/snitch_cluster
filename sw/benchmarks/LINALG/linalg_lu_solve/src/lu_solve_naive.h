@@ -17,7 +17,6 @@
 */
 
 
-
 void lu_solve_naive(uint64_t *start_cycle, uint64_t *end_cycle,
                     float *mat, uint32_t *perm, float *y, float *vec, float *result,
                     float *local_sum) {
@@ -33,26 +32,26 @@ void lu_solve_naive(uint64_t *start_cycle, uint64_t *end_cycle,
     // FORWARD SUBSTITUTION (L * y = P * vec)
     // -------------------------
     for (uint32_t m = 0; m < elems; m++) {
-        if(snrt_is_compute_core()){
-            // reset buffer
-            local_sum[core_idx] = 0.0f;
-            
+        
+        // reset buffer
+        local_sum[core_idx] = 0.0f;
+        
 
-                // numero di elementi da sommare: k in [0, m)
-            int count = m; // può essere 0
-            int block = count / (int)ncores;
-            int left  = count % (int)ncores;
+            // numero di elementi da sommare: k in [0, m)
+        int count = m; // può essere 0
+        int block = count / (int)ncores;
+        int left  = count % (int)ncores;
 
-            // start/end per questo core (distribuzione dei resti sui primi 'left' core)
-            int start = core_idx * block + (core_idx < (uint32_t)left ? core_idx : left);
-            int end   = start + block + (core_idx < (uint32_t)left ? 1 : 0);
+        // start/end per questo core (distribuzione dei resti sui primi 'left' core)
+        int start = core_idx * block + (core_idx < (uint32_t)left ? core_idx : left);
+        int end   = start + block + (core_idx < (uint32_t)left ? 1 : 0);
 
-            for (uint32_t k = start; k < end; k++)
-                local_sum[core_idx] += mat[m * elems + k] * y[k];
-        }
+        for (uint32_t k = start; k < end; k++)
+            local_sum[core_idx] += mat[m * elems + k] * y[k];
+        
 
         // barrier: attendi che tutti i core finiscano
-        snrt_cluster_hw_barrier();
+        snrt_partial_barrier(&barr, 8);
 
         // core 0 somma tutte le parti e aggiorna y[m]
         if (core_idx == 0) {
@@ -65,35 +64,35 @@ void lu_solve_naive(uint64_t *start_cycle, uint64_t *end_cycle,
         }
         
         // barrier: tutti i core attendono che y[m] sia calcolato
-        snrt_cluster_hw_barrier();
+        snrt_partial_barrier(&barr, 8);
     }
 
-    snrt_cluster_hw_barrier();
+    snrt_partial_barrier(&barr, 8);
 
 
     // BACKWARD SUBSTITUTION (U * result = y)
     
     for (int m = (int) elems - 1; m >=0; m--) {
-        if(snrt_is_compute_core()){
-            local_sum[core_idx] = 0.0;
-            
+       
+        local_sum[core_idx] = 0.0;
+        
 
-             // la finestra su cui sommare è k in [m+1, elems)
-            int count = (int)elems - (m + 1); // numero elementi nella finestra, può essere 0
-            int block = count / (int)ncores;
-            int left  = count % (int)ncores;
+            // la finestra su cui sommare è k in [m+1, elems)
+        int count = (int)elems - (m + 1); // numero elementi nella finestra, può essere 0
+        int block = count / (int)ncores;
+        int left  = count % (int)ncores;
 
-            int start_rel = core_idx * block + (core_idx < (uint32_t)left ? core_idx : left);
-            int end_rel   = start_rel + block + (core_idx < (uint32_t)left ? 1 : 0);
+        int start_rel = core_idx * block + (core_idx < (uint32_t)left ? core_idx : left);
+        int end_rel   = start_rel + block + (core_idx < (uint32_t)left ? 1 : 0);
 
-            int start = (m + 1) + start_rel;
-            int end   = (m + 1) + end_rel;
+        int start = (m + 1) + start_rel;
+        int end   = (m + 1) + end_rel;
 
-            for (int k = start; k < end; k++)
-                local_sum[core_idx] += mat[m * elems + k] * result[k];
-        }
+        for (int k = start; k < end; k++)
+            local_sum[core_idx] += mat[m * elems + k] * result[k];
+        
 
-        snrt_cluster_hw_barrier();
+        snrt_partial_barrier(&barr, 8);
 
         // core 0 somma e calcola result[m]
         if (core_idx == 0) {
@@ -103,7 +102,7 @@ void lu_solve_naive(uint64_t *start_cycle, uint64_t *end_cycle,
             result[m] = (y[m] - sum) / mat[m * elems + m];
         }
      
-        snrt_cluster_hw_barrier();
+        snrt_partial_barrier(&barr, 8);
     }
 
     *end_cycle = snrt_mcycle();

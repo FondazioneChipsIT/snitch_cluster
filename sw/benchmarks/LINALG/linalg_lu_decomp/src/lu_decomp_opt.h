@@ -49,6 +49,8 @@
 // in case we need the simple version, for elems <32
 static inline void swap_rows_simple(float *mat, uint32_t n, uint32_t r1, uint32_t r2);
 
+snrt_barrier_t barr;
+
 void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, uint64_t *end_cycle, 
                         float *mat, int *perm, 
                         float *row_k, float *row_b, float *vec_write_back) {
@@ -136,67 +138,67 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
         }
         
         // cores need to wait for the pivot row to be ready
-        snrt_cluster_hw_barrier();
+        snrt_partial_barrier(&barr, 8);
 
         // Each core has its own copy of the pivot row
         float pivot = mat[k * elems + k];
         float p_inv = 1.0f / pivot;
 
-        if(snrt_is_compute_core()){
-        
-            // for columns after k, distribute rows among cores
-            left = (elems - (k + 1)) % ncores;
-            base = (elems - (k + 1)) / ncores;
-            chunk_per_core = base + (core_idx < left ? 1 : 0);
-            offset = (k + 1) + core_idx * base + (core_idx < left ? core_idx : left);
-            end = offset + chunk_per_core;
+    
+    
+        // for columns after k, distribute rows among cores
+        left = (elems - (k + 1)) % ncores;
+        base = (elems - (k + 1)) / ncores;
+        chunk_per_core = base + (core_idx < left ? 1 : 0);
+        offset = (k + 1) + core_idx * base + (core_idx < left ? core_idx : left);
+        end = offset + chunk_per_core;
 
-            // for rows, we must add an offset of (k+1)
-            // so total rows to consider is elems-(k+1)
-            uint32_t row_chunk = elems - (k + 1);
-            uint32_t row_offset = k + 1;
+        // for rows, we must add an offset of (k+1)
+        // so total rows to consider is elems-(k+1)
+        uint32_t row_chunk = elems - (k + 1);
+        uint32_t row_offset = k + 1;
 
-            for (int m = offset; m < end; m++) {
+        for (int m = offset; m < end; m++) {
 
-                float factor;
+            float factor;
 
-                // Same as before, cannot be optimized with SSRs
-                factor = mat[m * elems + k] * p_inv;
-                mat[m * elems + k] = factor;
+            // Same as before, cannot be optimized with SSRs
+            factor = mat[m * elems + k] * p_inv;
+            mat[m * elems + k] = factor;
 
-                 /* Load factor into ft3 */
-                asm volatile(
-                "flw ft3, 0(%[factor])\n"
-                :
-                : [factor] "r"(&factor)
-                : "ft3");
+                /* Load factor into ft3 */
+            asm volatile(
+            "flw ft3, 0(%[factor])\n"
+            :
+            : [factor] "r"(&factor)
+            : "ft3");
 
-                // 3 SSR to read matrix rows and write vec
-                snrt_ssr_loop_1d(SNRT_SSR_DM0, row_chunk, sizeof(float));
-                snrt_ssr_loop_1d(SNRT_SSR_DM1, row_chunk, sizeof(float));
-                snrt_ssr_loop_1d(SNRT_SSR_DM2, row_chunk, sizeof(float));
+            // 3 SSR to read matrix rows and write vec
+            snrt_ssr_loop_1d(SNRT_SSR_DM0, row_chunk, sizeof(float));
+            snrt_ssr_loop_1d(SNRT_SSR_DM1, row_chunk, sizeof(float));
+            snrt_ssr_loop_1d(SNRT_SSR_DM2, row_chunk, sizeof(float));
 
-                // read the matrix, use a buffer to store results
-                snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, mat + k * elems + row_offset); // pivot row
-                snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, mat + m * elems + row_offset); // current row
-                snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, mat + m * elems + row_offset); // write back
-                
-                snrt_ssr_enable();
+            // read the matrix, use a buffer to store results
+            snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, mat + k * elems + row_offset); // pivot row
+            snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, mat + m * elems + row_offset); // current row
+            snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, mat + m * elems + row_offset); // write back
+            
+            snrt_ssr_enable();
 
-                asm volatile(
-                "frep.o %[n_frep], 2, 0, 0 \n"  // repeat the next 2 instructions
-                "fmul.s ft4, ft0, ft3\n" // ft4 = ft0 (pivot row) * ft3 (factor)
-                "fsub.s ft2, ft1, ft4\n" // ft2 = ft1 (current row) - ft4 (result)
-                :
-                : [n_frep] "r"(row_chunk - 1)
-                : "ft0", "ft1", "ft2", "ft3", "ft4", "memory");
+            asm volatile(
+            "frep.o %[n_frep], 2, 0, 0 \n"  // repeat the next 2 instructions
+            "fmul.s ft4, ft0, ft3\n" // ft4 = ft0 (pivot row) * ft3 (factor)
+            "fsub.s ft2, ft1, ft4\n" // ft2 = ft1 (current row) - ft4 (result)
+            :
+            : [n_frep] "r"(row_chunk - 1)
+            : "ft0", "ft1", "ft2", "ft3", "ft4", "memory");
 
 
-                snrt_ssr_disable();
-                 snrt_fpu_fence();
-            }
-
+            snrt_ssr_disable();
+            snrt_fpu_fence();
         }
+
+    
 
     }
         

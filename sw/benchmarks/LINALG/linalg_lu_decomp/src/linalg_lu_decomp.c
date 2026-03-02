@@ -46,12 +46,14 @@ int main() {
     snrt_cluster_hw_barrier();
 
     // kernel call
-    if(use_opt == 1)
-        lu_decomp_opt(core_idx, ncores, &start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec,
-                      row_k, row_b, vec_write_back);
-    else
-        lu_decomp_naive(core_idx, ncores, &start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec);
+    if(snrt_is_compute_core()) {
+        if(use_opt == 1)
+            lu_decomp_opt(core_idx, ncores, &start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec,
+                        row_k, row_b, vec_write_back);
+        else
+            lu_decomp_naive(core_idx, ncores, &start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec);
+    }
 
-
+    
     return 0;
 }

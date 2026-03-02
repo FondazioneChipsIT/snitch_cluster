@@ -80,35 +80,35 @@ void lu_decomp_naive(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, 
             }
         }
     
-        snrt_cluster_hw_barrier();
+        snrt_partial_barrier(&barr, 8);
         float pivot = mat[k * elems + k];
         float p_inv = 1.0f / pivot;
 
-        if(snrt_is_compute_core()){
+    
 
-            /* Gaussian Elimination */
-            int start;
-            int block;
-            int left;
-            int end;
+        /* Gaussian Elimination */
+        int start;
+        int block;
+        int left;
+        int end;
 
-            block = (elems - (k + 1)) / ncores;
-            left = (elems - (k + 1)) % ncores;
-            start = core_idx * block + (core_idx < left ? core_idx : left) + (k + 1);
-            end = start + block + (core_idx < left ? 1 : 0);
+        block = (elems - (k + 1)) / ncores;
+        left = (elems - (k + 1)) % ncores;
+        start = core_idx * block + (core_idx < left ? core_idx : left) + (k + 1);
+        end = start + block + (core_idx < left ? 1 : 0);
 
-            for (int m = start; m < end; m++) {
-                float factor;
+        for (int m = start; m < end; m++) {
+            float factor;
 
-                factor = mat[m * elems + k] * p_inv;
-                mat[m * elems + k] = factor;
+            factor = mat[m * elems + k] * p_inv;
+            mat[m * elems + k] = factor;
 
-                for (int n = k + 1; n < elems; n++)
-                    mat[m * elems + n] -= factor * mat[k * elems + n];
-            }
+            for (int n = k + 1; n < elems; n++)
+                mat[m * elems + n] -= factor * mat[k * elems + n];
         }
+    
 
-        snrt_cluster_hw_barrier();
+        snrt_partial_barrier(&barr, 8);
     }
 
     *end_cycle = snrt_mcycle();

@@ -36,10 +36,10 @@ int main() {
     snrt_cluster_hw_barrier();
 
     // kernel call
-    if(use_opt == 1)
+    if(use_opt == 1 && snrt_is_compute_core())
         ch_decomp_opt(core_idx, ncores, &start_cycle[core_idx], &end_cycle[core_idx], mat, dst, elems);
     else{
-
+        
     }
     
     return 0;

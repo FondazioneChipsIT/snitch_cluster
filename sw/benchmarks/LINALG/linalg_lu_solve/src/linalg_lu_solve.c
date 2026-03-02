@@ -73,12 +73,14 @@ int main() {
     snrt_cluster_hw_barrier();
 
     // kernel call for every core as there are barriers
-    if(use_opt == 1)
-        lu_solve_opt(core_idx, ncores, &start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec, y, vec, result);
-    else
-        lu_solve_naive(&start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec, y, vec, result, local_sum);
 
-    // DEBUG 
-    //if(core_idx == 0) lu_solve_serial(mat,perm_vec,y,vec,result);
+    if(snrt_is_compute_core()) {
+        if(use_opt == 1)
+            lu_solve_opt(core_idx, ncores, &start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec, y, vec, result);
+        else
+            lu_solve_naive(&start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec, y, vec, result, local_sum);
+
+    }
+    
     return 0;
 }
