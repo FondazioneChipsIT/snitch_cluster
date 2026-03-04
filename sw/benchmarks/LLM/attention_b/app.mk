@@ -8,5 +8,6 @@ APP              := attention_b
 $(APP)_BUILD_DIR ?= $(SN_ROOT)/sw/benchmarks/LLM/$(APP)/build
 SRC_DIR          := $(SN_ROOT)/sw/benchmarks/LLM/$(APP)/src
 SRCS             := $(SRC_DIR)/main.c
+$(APP)_INCDIRS   := $(SN_ROOT)/sw/benchmarks/LLM/$(APP)/data
 
 include $(SN_ROOT)/sw/kernels/dnn/common.mk
