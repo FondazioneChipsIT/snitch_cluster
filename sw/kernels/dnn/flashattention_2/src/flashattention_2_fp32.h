@@ -14,7 +14,8 @@ static inline void flashattention_2_fp32(flashattention_2_layer_t layer) {
     uint32_t B_r = layer.B_r;
     uint32_t B_c = layer.B_c;
     uint32_t baseline = layer.baseline;
-    gemm_fp_t gemm_implementation = layer.gemm_implementation;
+    // Problems using the vfpk instructions with the 32 bit Snitch
+    gemm_fp_t gemm_implementation = gemm_fp32_naive_unrolled;
     float *Q_l3 = (float *)layer.Q;
     float *K_l3 = (float *)layer.K;
     float *V_l3 = (float *)layer.V;

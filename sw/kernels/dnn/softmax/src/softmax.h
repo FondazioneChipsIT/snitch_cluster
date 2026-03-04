@@ -34,21 +34,26 @@ typedef struct softmax_layer_struct {
     precision_t dtype;
 } softmax_layer_t;
 
+snrt_barrier_t barr;
+
 /**
  * Implementation of the SoftMax layer.
  */
 static inline void softmax_fp32(float *input, float *output, int32_t ldI,
                                 int32_t batch_offset, int32_t batch_size,
                                 int32_t seq_len, int32_t input_samples) {
-    float max_core = 0.0f;  // max value of the current core
-    float sum = 0.0f;       // sum of the exp values of the current core
+    float max_core;  // max value of the current core
+    float sum ;       // sum of the exp values of the current core
+
+    uint32_t core_idx = snrt_cluster_core_idx();
     snrt_mcycle();
+
     for (int32_t b = 0; b < batch_size; b++) {
         for (int32_t s = 0; s < seq_len; s++) {
-            max_core = -INFINITY;
+            max_core = input[b * batch_offset + s * ldI];  // initialize the max value of the current core
             sum = 0.0f;
 
-            for (int32_t i = 0; i < input_samples; i++) {
+            for (int32_t i = 1; i < input_samples; i++) {
                 if (input[b * batch_offset + s * ldI + i] > max_core) {
                     max_core = input[b * batch_offset + s * ldI + i];
                 }
@@ -56,8 +61,9 @@ static inline void softmax_fp32(float *input, float *output, int32_t ldI,
 
             // compute the shifted value of the current row
             for (int32_t i = 0; i < input_samples; i++) {
-                output[b * batch_offset + s * ldI + i] =
-                    expf(input[b * batch_offset + s * ldI + i] - max_core);
+                // avoid infinite value of exp by clipping the input value to 88.0f
+                float val = fminf(input[b * batch_offset + s * ldI + i] - max_core, 88.0f);
+                output[b * batch_offset + s * ldI + i] = expf(val);
                 sum += output[b * batch_offset + s * ldI + i];
             }
 
@@ -67,8 +73,10 @@ static inline void softmax_fp32(float *input, float *output, int32_t ldI,
             }
         }
     }
+
     snrt_mcycle();
-    snrt_cluster_hw_barrier();
+
+    snrt_partial_barrier(&barr, 8);
 }
 
 /**
@@ -133,4 +141,5 @@ static inline void softmax_layer(softmax_layer_t const l) {
     }
 
     snrt_global_barrier();
+    return;
 }

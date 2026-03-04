@@ -1,105 +1,94 @@
 #!/usr/bin/env python3
-# Copyright 2023 ETH Zurich and University of Bologna.
+# Copyright 2026 ETH Zurich and University of Bologna.
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Tim Fischer <fischeti@iis.ee.ethz.ch>
-# Viviane Potocnik <vivianep@iis.ee.ethz.ch>
-# Luca Colagrande <colluca@iis.ee.ethz.ch>
+# Generate data.h for the softmax kernel.
+# Place this script in the kernel folder and run it; it will create data/data.h.
 
-import argparse
-import pathlib
-import json5
-import torch
+import numpy as np
+import os
 
-from snitch.util.sim import data_utils
-from snitch.util.sim.data_utils import emit_license, format_struct_definition, \
-    format_array_definition, format_array_declaration, format_ifdef_wrapper
+# Output goes to <script_dir>/../data/ regardless of where you call the script from
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-torch.manual_seed(42)
+# ──────────────────────────────────────────────
+#  Configuration
+# ──────────────────────────────────────────────
+BATCH_SIZE     = 3
+SEQ_LEN        = 16
+INPUT_SAMPLES  = 4
+DTYPE          = "FP32"
+SEED           = 42          # set to None for a random seed
+# ──────────────────────────────────────────────
 
-# AXI splits bursts crossing 4KB address boundaries. To minimize
-# the occurrence of these splits the data should be aligned to 4KB
-BURST_ALIGNMENT = 4096
+def softmax(x):
+    """Numerically stable softmax along the last axis."""
+    x = x - x.max(axis=-1, keepdims=True)
+    e = np.exp(np.minimum(x, 88.0))   # same clip used in the C kernel
+    return e / e.sum(axis=-1, keepdims=True)
 
+def fmt_float(v):
+    """Format a float the same way PyTorch repr does (enough digits, no suffix)."""
+    return repr(float(v))
 
-def golden_model(ifmap, axis):
-    softmax = torch.nn.Softmax(dim=axis)
-    return softmax(ifmap)
+def write_c_array(f, name, data, dtype_decl, align=4096, extern=False):
+    """Write a flat C array declaration."""
+    flat = data.flatten()
+    n    = len(flat)
 
+    if extern:
+        f.write(f"extern {dtype_decl} {name}[{n}] __attribute__ ((aligned ({align})));\n\n")
+        return
 
-def emit_header(**kwargs):
-    batch_size = kwargs['input_dim']['batch_size']
-    seq_len = kwargs['input_dim']['seq_len']
-    input_samples = kwargs['input_dim']['input_samples']
-    reduce_dim = kwargs['reduce_dim']
-    prec = kwargs['prec']
-
-    torch_type = data_utils.torch_type_from_precision_t(prec)
-    ifmap = torch.randn(batch_size, seq_len, input_samples, requires_grad=False, dtype=torch_type)
-
-    ofmap = golden_model(ifmap, reduce_dim)
-    ofmap = ofmap.detach().numpy()
-
-    ifmap = data_utils.flatten(ifmap)
-    ofmap = data_utils.flatten(ofmap)
-
-    ctype = data_utils.ctype_from_precision_t(prec)
-
-    ifmap_uid = 'ifmap'
-    ofmap_uid = 'ofmap'
-
-    layer_cfg = {
-        **kwargs['input_dim'],
-        'reduce_dim': reduce_dim,
-        'ifmap': ifmap_uid,
-        'ofmap': ofmap_uid,
-        'dtype': prec
-    }
-
-    data_str = [emit_license()]
-    data_str += [format_array_declaration(f'extern {ctype}', ifmap_uid, ifmap.shape,
-                 alignment=BURST_ALIGNMENT)]
-    data_str += [format_array_declaration(ctype, ofmap_uid, ofmap.shape,
-                 alignment=BURST_ALIGNMENT)]
-    data_str += [format_struct_definition('softmax_layer_t', 'layer', layer_cfg)]
-    data_str += [format_array_definition(ctype, ifmap_uid, ifmap,
-                 alignment=BURST_ALIGNMENT)]
-    result_def = format_array_definition(ctype, 'golden', ofmap, alignment=BURST_ALIGNMENT)
-    data_str += [format_ifdef_wrapper('BIST', result_def)]
-    data_str = '\n\n'.join(data_str)
-
-    return data_str
-
+    f.write(f"{dtype_decl} {name}[{n}] __attribute__ ((aligned ({align}))) = {{\n")
+    for i, v in enumerate(flat):
+        f.write(f"\t{fmt_float(v)},\n")
+    f.write("};\n\n")
 
 def main():
+    rng = np.random.default_rng(SEED)
 
-    parser = argparse.ArgumentParser(description='Generate data for layernorm kernel')
-    parser.add_argument(
-        "-c", "--cfg",
-        type=pathlib.Path,
-        required=True,
-        help='Select param config file kernel'
-    )
-    parser.add_argument(
-        '--section',
-        type=str,
-        help='Section to store matrices in')
-    parser.add_argument(
-        'output',
-        type=pathlib.Path,
-        help='Path of the output header file')
-    args = parser.parse_args()
+    total = BATCH_SIZE * SEQ_LEN * INPUT_SAMPLES
 
-    # Load param config file
-    with args.cfg.open() as f:
-        param = json5.loads(f.read())
-    param['section'] = args.section
+    # Shape: (batch, seq, samples) – softmax over last dim
+    ifmap_3d = rng.standard_normal((BATCH_SIZE, SEQ_LEN, INPUT_SAMPLES)).astype(np.float32)
+    golden_3d = softmax(ifmap_3d).astype(np.float32)
 
-    # Emit header file
-    with open(args.output, 'w') as f:
-        f.write(emit_header(**param))
+    out_dir = os.path.join(SCRIPT_DIR, "..", "data")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.normpath(os.path.join(out_dir, "data.h"))
 
+    with open(out_path, "w") as f:
+        # Header
+        f.write("// Copyright 2026 ETH Zurich and University of Bologna.\n")
+        f.write("// Licensed under the Apache License, Version 2.0, see LICENSE for details.\n")
+        f.write("// SPDX-License-Identifier: Apache-2.0\n")
+        f.write("//\n")
+        f.write("// Auto-generated by generate_data.py – do not edit manually.\n\n")
 
-if __name__ == '__main__':
+        f.write("#pragma once\n\n")
+
+        # Layer parameters as #defines so the C code can use them directly
+        f.write(f"#define BATCH_SIZE    {BATCH_SIZE}\n")
+        f.write(f"#define SEQ_LEN       {SEQ_LEN}\n")
+        f.write(f"#define INPUT_SAMPLES {INPUT_SAMPLES}\n")
+        f.write(f"#define DTYPE         {DTYPE}\n\n")
+
+        # extern forward declaration (mirrors original style)
+        write_c_array(f, "ifmap", ifmap_3d, "float", extern=True)
+
+        # ofmap (output buffer, no initializer needed)
+        f.write(f"float ofmap[{total}] __attribute__ ((aligned (4096)));\n\n")
+
+        # actual ifmap definition
+        write_c_array(f, "ifmap", ifmap_3d, "float")
+
+        # golden output
+        write_c_array(f, "golden", golden_3d, "float")
+       
+
+    print(f"Generated {out_path}  ({total} elements, batch={BATCH_SIZE} seq={SEQ_LEN} samples={INPUT_SAMPLES})")
+
+if __name__ == "__main__":
     main()

@@ -21,8 +21,8 @@ SN_RISCV_OBJDUMP ?= $(SN_LLVM_BINROOT)/llvm-objdump
 # Compiler flags
 SN_RISCV_CFLAGS := -mcpu=snitch
 SN_RISCV_CFLAGS += -menable-experimental-extensions
-# SN_RISCV_CFLAGS += --target=riscv32-unknown-elf
-# SN_RISCV_CFLAGS += -march=rv32imaf_xdma_xssr_xf16alt
+SN_RISCV_CFLAGS += --target=riscv32-unknown-elf
+# SN_RISCV_CFLAGS += -march=rv32imaf_xdma_xssr
 SN_RISCV_CFLAGS += -mabi=ilp32d	
 SN_RISCV_CFLAGS += -mcmodel=medany
 SN_RISCV_CFLAGS += -mno-fdiv
