@@ -21,7 +21,7 @@ void conv3x3_naive(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
             uint32_t y_row = offset + r;
 
 
-            for (uint32_t c = 0; c < LEN - 2; c++) {
+            for (uint32_t c = 0; c < FM_ROWS - 2; c++) {
 
                 float acc = 0.0f;
 
@@ -30,7 +30,7 @@ void conv3x3_naive(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
                     for (uint32_t kc = 0; kc < 3; kc++) {
 
                         float x_val =
-                            x[(x_row + kr) * LEN + (c + kc)];
+                            x[(x_row + kr) * FM_ROWS + (c + kc)];
                         float h_val =
                             h[kr * 3 + kc];
 
@@ -39,7 +39,7 @@ void conv3x3_naive(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
                 }
 
 
-                y[y_row * (LEN - 2) + c] = acc;
+                y[y_row * (FM_ROWS - 2) + c] = acc;
             }
         }
         snrt_mcycle();

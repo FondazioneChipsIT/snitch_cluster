@@ -9,6 +9,8 @@
 
 bool use_opt = 1;
 
+uint32_t CHECK_RESULTS = 1; // Set to 1 to check results against golden output
+
 int main(){
     // Core ID and core count
     uint32_t core_idx = snrt_cluster_core_idx();
@@ -16,27 +18,16 @@ int main(){
     // DM core allocates memory in TCDM and initializes the vectors
     if(snrt_is_dm_core()){
 
-        // Pointers to TCDM memory, spaced by LEN 
-        x = (float *)snrt_l1_next();
-        y = x + LEN*LEN;
-        // Y without padding has less elements
-        h = y + (LEN-2)*(LEN-2);
+        input_TCDM = (float *)snrt_l1_next();
+        dst_TCDM = input_TCDM + FM_ROWS * FM_ROWS;
+        kernel_TCDM = dst_TCDM + OUT_ROWS * OUT_ROWS;
 
-        // If pointers are null -> break
-        if (!x || !y || !h) {
-            printf("Memory allocation failed!\n");
-            return -1;
-        } 
+        size_t size = FM_ROWS * FM_ROWS * sizeof(float);
+        size_t size_filter = 3 * 3 * sizeof(float);
 
-        // Initialize the values of vectors, can change as you like
-        for(uint32_t i = 0; i<LEN*LEN; i++){
-            x[i] = (float)i;
-            
-        }
-
-        for(uint32_t i=0; i<CONV3x3_LEN*CONV3x3_LEN;i++){
-            h[i] = (float)(i);
-        }
+        snrt_dma_start_1d(input_TCDM, input_fm, size);
+        snrt_dma_start_1d(kernel_TCDM, conv_kernel, size_filter);
+        snrt_dma_wait_all();
 
     }
 
@@ -47,7 +38,7 @@ int main(){
 
         // Compute the chunk of the matrix, represents
         // the number of rows each core has to use
-        uint32_t chunk_per_core = LEN/ncores;
+        uint32_t chunk_per_core = FM_ROWS/ncores;
 
         if(chunk_per_core == 0){
             printf("Chunk for each core is 0!\n");
@@ -58,29 +49,23 @@ int main(){
         
         // Call the kernel
         if(use_opt)
-            conv3x3_opt(core_idx,chunk_per_core, offset, x, y, h);
+            conv3x3_opt(core_idx,chunk_per_core, offset, input_TCDM, dst_TCDM, kernel_TCDM);
         else 
-            conv3x3_naive(core_idx,chunk_per_core, offset, x, y, h);
+            conv3x3_naive(core_idx,chunk_per_core, offset, input_TCDM, dst_TCDM, kernel_TCDM);
 
     }
 
     snrt_cluster_hw_barrier(); // Barrier syncronization
 
-    /*if(core_idx==0){
+    uint32_t err = 0;
 
-        // Do not read last two cols and rows, are not used
-        for(uint32_t i = 0; i<LEN-2; i++){
-            printf("Row %d: ",i);
-            for(uint32_t j = 0; j<LEN-2; j++){
-                printf(" %.1f ", y[i*(LEN-2)+j]);
+    if (CHECK_RESULTS == 1 && core_idx == 0) {
+        for(uint32_t i = 0; i < OUT_ROWS * OUT_ROWS; i++){
+            if(fabsf(dst_TCDM[i] - golden[i]) > 1e-5f){
+                err ++;
             }
-            printf("\n");
         }
+    }
 
-
-    }*/
-
-    return 0;
+    return err;
 }
-
-/* NEVER USE FLOAT TYPE! BREAKS EVERYTHING! */
