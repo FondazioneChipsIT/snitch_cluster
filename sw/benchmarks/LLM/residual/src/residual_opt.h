@@ -2,7 +2,7 @@
 /* Pretty simple, adds two matrices*/
 
 void residual_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
-    double *x, double *y, double *out){
+    float *x, float *y, float *out){
 
     snrt_mcycle();
 
@@ -11,9 +11,9 @@ void residual_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
 
     // Setup the 1d loop with ssr (tell which streams to use, the size and the size of
     // the elements)
-    snrt_ssr_loop_1d(SNRT_SSR_DM0, tot_ops, sizeof(double));
-    snrt_ssr_loop_1d(SNRT_SSR_DM1, tot_ops, sizeof(double));
-    snrt_ssr_loop_1d(SNRT_SSR_DM2, tot_ops, sizeof(double));
+    snrt_ssr_loop_1d(SNRT_SSR_DM0, tot_ops, sizeof(float));
+    snrt_ssr_loop_1d(SNRT_SSR_DM1, tot_ops, sizeof(float));
+    snrt_ssr_loop_1d(SNRT_SSR_DM2, tot_ops, sizeof(float));
 
     // Read from ft0 and ft1 that will be wired to a and b 
     snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, x + offset*LEN); //ft0->x
@@ -27,7 +27,7 @@ void residual_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
     // Assembly code to add ft0 and ft1 to ft2
     asm volatile(
         "frep.o %[n_frep], 1, 0, 0 \n"
-        "fadd.d ft2, ft0, ft1\n"
+        "fadd.s ft2, ft0, ft1\n"
         :
         : [ n_frep ] "r"(tot_ops - 1)
         : "ft0", "ft1", "ft2", "memory");

@@ -27,6 +27,8 @@ void fir_naive(uint32_t chunk_per_core, uint32_t offset,
 
 bool use_opt = 1;
 
+uint32_t CHECK_RESULTS = 1;
+
 int main(){
     // Core ID and core count
     uint32_t core_idx = snrt_cluster_core_idx();
@@ -35,22 +37,16 @@ int main(){
     // DM core allocates memory in TCDM and initializes the vectors
     if(snrt_is_dm_core()){
 
-        // Pointers to TCDM memory, spaced by LEN 
         x = (float *)snrt_l1_next();
         y = x + LEN;
         h = y + LEN;
 
-        // If pointers are null -> break
-        if (!x || !y || !h) {
-            printf("Memory allocation failed!\n");
-            return -1;
-        } 
+        size_t size = LEN * sizeof(float);
+        size_t size_filter = FILTER_LEN * sizeof(float);
 
-        // Initialize the values of vectors, can change as you like
-        for(uint32_t i = 0; i<LEN; i++){
-            x[i] = (float)i;
-            h[i] = (float)(LEN-i);
-        }
+        snrt_dma_start_1d(x, x_data, size);
+        snrt_dma_start_1d(h, h_data, size_filter);
+        snrt_dma_wait_all();
 
     }
 
@@ -60,7 +56,7 @@ int main(){
     if(snrt_is_compute_core()){
 
         // Compute the chunk of the vector per core, and the offset that is used to space them
-        uint32_t chunk_per_core = LEN/ncores;
+        uint32_t chunk_per_core = LEN/ncores; 
         if(chunk_per_core == 0){
             printf("Chunk for each core is 0!\n");
             return -2;
@@ -77,7 +73,15 @@ int main(){
 
     }
 
-    return 0;
-}
+    uint32_t err = 0;
 
-/* NEVER USE FLOAT TYPE! BREAKS EVERYTHING! */
+    if (CHECK_RESULTS == 1 && core_idx == 0) {
+        for(uint32_t i = 0; i < LEN; i++){
+            if(fabsf(y[i] - golden_y[i]) > 1e-5f){
+                err ++;         
+            }
+        }
+    }
+
+    return err;
+}

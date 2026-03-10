@@ -8,7 +8,7 @@ APP                 := kmeans_b
 $(APP)_BUILD_DIR    ?= $(SN_ROOT)/sw/benchmarks/DSP/$(APP)/build
 SRC_DIR             := $(SN_ROOT)/sw/benchmarks/DSP/$(APP)/src
 SRCS                := $(SRC_DIR)/main.c
+$(APP)_INCDIRS   := $(SN_ROOT)/sw/benchmarks/DSP/$(APP)/data
 $(APP)_DATAGEN_ARGS  = --no-gui
 
-include $(SN_ROOT)/sw/kernels/datagen.mk
 include $(SN_ROOT)/sw/kernels/common.mk

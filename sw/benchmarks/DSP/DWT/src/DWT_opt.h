@@ -13,8 +13,6 @@ void dwt_opt(uint32_t chunk_per_core, uint32_t offset,
     : [zero] "r"(&zero)
     : "ft3","ft4");
 
-    
-
     for (uint32_t n = 0; n < chunk_per_core; n++) {
 
         uint32_t out = offset + n;

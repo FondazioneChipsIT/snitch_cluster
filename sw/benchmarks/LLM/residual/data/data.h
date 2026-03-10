@@ -1,9 +1,9 @@
 #ifndef DATA_H
 #define DATA_H
 // TCDM pointers to our data
-double *x,*y,*out;
+float *x,*y,*out;
 
-// Matrix length (for now only a multiple of ncores, default 8)
+/* Square matrix dimension (LEN x LEN, must be a multiple of ncores) */
 #ifndef LEN
 #define LEN 64
 #endif 

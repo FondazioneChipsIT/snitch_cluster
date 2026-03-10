@@ -1,20 +1,39 @@
 #ifndef DATA_H
 #define DATA_H
 
-// Matrix elems (for now only a multiple of ncores, default 8)
+/* Square SPD matrix dimension */
 #ifndef elems
-#define elems 64
+#define elems 8
 #endif
 
-// TCDM pointers to our data
-float *mat, *dst;
+/* TCDM pointers – filled at runtime by DM core */
+float *mat;
+float *dst;
 
-float local_sum[8];
+float local_sum[16];
 
-// Cycle and performance metrics
-uint64_t start_cycle[16], end_cycle[16], total_cycles[16]; // Increase the num if ncores>16
-float flop_cycle[16];
-// How many times does the row swap happen
-uint32_t swap_rows_times = 0;
+/* Input: random symmetric positive-definite matrix (row-major) */
+float mat_data[elems * elems] = {
+    76.982307f, 3.850700f, 7.533300f, 6.118677f, 0.826308f, 8.560067f, 6.678206f, 6.896894f,
+    3.850700f, 71.601639f, 3.510206f, 8.137582f, 5.482241f, 7.380833f, 4.081069f, 2.265242f,
+    7.533300f, 3.510206f, 78.801750f, 6.518502f, 7.011724f, 4.272370f, 9.386894f, 8.643316f,
+    6.118677f, 8.137582f, 6.518502f, 66.446991f, 2.382319f, 7.161128f, 7.545611f, 9.105384f,
+    0.826308f, 5.482241f, 7.011724f, 2.382319f, 67.117561f, 4.863222f, 3.052720f, 6.492217f,
+    8.560067f, 7.380833f, 4.272370f, 7.161128f, 4.863222f, 79.971191f, 5.479854f, 4.788651f,
+    6.678206f, 4.081069f, 9.386894f, 7.545611f, 3.052720f, 5.479854f, 78.254410f, 9.346664f,
+    6.896894f, 2.265242f, 8.643316f, 9.105384f, 6.492217f, 4.788651f, 9.346664f, 80.369804f,
+};
 
-#endif
+/* Golden output: lower-triangular L s.t. mat = L * L^T (row-major) */
+float golden_L[elems * elems] = {
+    8.773956f, 0.000000f, 0.000000f, 0.000000f, 0.000000f, 0.000000f, 0.000000f, 0.000000f,
+    0.438878f, 8.450386f, 0.000000f, 0.000000f, 0.000000f, 0.000000f, 0.000000f, 0.000000f,
+    0.858598f, 0.370798f, 8.827631f, 0.000000f, 0.000000f, 0.000000f, 0.000000f, 0.000000f,
+    0.697368f, 0.926765f, 0.631664f, 8.043803f, 0.000000f, 0.000000f, 0.000000f, 0.000000f,
+    0.094177f, 0.643865f, 0.758088f, 0.154289f, 8.129922f, 0.000000f, 0.000000f, 0.000000f,
+    0.975622f, 0.822762f, 0.354526f, 0.683049f, 0.475705f, 8.804765f, 0.000000f, 0.000000f,
+    0.761140f, 0.443414f, 0.970698f, 0.744762f, 0.226909f, 0.387478f, 8.705166f, 0.000000f,
+    0.786064f, 0.227239f, 0.893121f, 0.967510f, 0.669814f, 0.288328f, 0.780729f, 8.764999f,
+};
+
+#endif /* DATA_H */

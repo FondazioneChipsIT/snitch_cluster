@@ -4,9 +4,8 @@
 snrt_barrier_t barr;
 
 void ch_decomp_opt(uint32_t core_idx, uint32_t ncores,
-                   uint64_t *start_cycle, uint64_t *end_cycle,
                    float *src, float *dst, uint32_t dim){
-    *start_cycle = snrt_mcycle();
+    snrt_mcycle();
 
     for (uint32_t m = 0; m < dim; m++) {
 
@@ -89,5 +88,5 @@ void ch_decomp_opt(uint32_t core_idx, uint32_t ncores,
         snrt_partial_barrier(&barr, 8);
     }
 
-    *end_cycle = snrt_mcycle();
+    snrt_mcycle();
 }

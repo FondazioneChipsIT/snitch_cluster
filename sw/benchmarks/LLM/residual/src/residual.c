@@ -7,7 +7,7 @@
 #include "residual_opt.h"
 
 void residual_naive(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
-    double *x, double *y, double *out){
+    float *x, float *y, float *out){
     
     snrt_mcycle();
 
@@ -32,7 +32,7 @@ int main(){
     if(snrt_is_dm_core()){
 
         // Pointers to TCDM memory, spaced by LEN 
-        x = (double *)snrt_l1_next();
+        x = (float *)snrt_l1_next();
         out = x + LEN*LEN;
         y = out + LEN*LEN;
 
@@ -44,8 +44,8 @@ int main(){
 
         // Initialize the values of vectors, can change as you like
         for(uint32_t i = 0; i<LEN*LEN; i++){
-            x[i] = (double)i;
-            y[i] = (double)i;
+            x[i] = (float)i;
+            y[i] = (float)i;
         }
 
     }
