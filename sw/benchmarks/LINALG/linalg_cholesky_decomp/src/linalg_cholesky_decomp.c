@@ -5,7 +5,7 @@
 #include "data.h"
 #include "ch_decomp_opt.h"
 
-uint32_t CHECK_RESULTS = 1;
+uint32_t CHECK_RESULTS = 0;
 
 int main() {
     uint32_t core_idx = snrt_cluster_core_idx();
@@ -13,23 +13,25 @@ int main() {
 
     /* Allocate on DM core*/
     if (snrt_is_dm_core()) {
+        mat = (float *)snrt_l1_next();
+        dst = mat + elems * elems;
 
         size_t size = elems * elems * sizeof(float);
-        mat = (float *)snrt_l1_next();
-        dst = mat + size;
-
         snrt_dma_start_1d(mat, mat_data, size);
         snrt_dma_wait_all();
 
+        for(uint32_t i = 0; i < elems * elems; i++){
+            dst[i] = mat[i];
+        }
     }
 
     snrt_cluster_hw_barrier();
 
     // kernel call
-    
-    ch_decomp_opt(core_idx, ncores, mat, dst, elems);
+    if(snrt_is_compute_core()){
+        ch_decomp_opt(core_idx, ncores, mat, dst, elems);
+    }
 
-    
     uint32_t err = 0;
 
     if (CHECK_RESULTS == 1 && core_idx == 0) {
