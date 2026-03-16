@@ -2,12 +2,9 @@
 
 #include "data.h"
 
-#include "layernorm_fp32.h"
+#include "layernorm.h"
 
 #include "snrt.h"
-
-// Pointers to TCDM
-float *ifmap_TCDM, *ofmap_TCDM;
 
 int main() {
 
@@ -21,7 +18,6 @@ int main() {
 
         ifmap_TCDM = (float *)snrt_l1_next();
         ofmap_TCDM = ifmap_TCDM + total_elems;
-
         size_t size = total_elems * sizeof(float);
 
         snrt_dma_start_1d(ifmap_TCDM, input, size);
@@ -33,8 +29,12 @@ int main() {
     // Only the compute cores do something
     if(snrt_is_compute_core()){
 
-        layernorm_fp32_opt(ifmap_TCDM, ofmap_TCDM, 
-                    BATCH_SIZE, SEQ_LEN, EMBEDDINGS, EPS);
+        // Divide the work among the cores
+        uint32_t rows_per_core = (BATCH_SIZE * SEQ_LEN) / ncores;
+
+        uint32_t offset = core_idx * rows_per_core * EMBEDDINGS;
+
+        layernorm(ifmap_TCDM + offset, ofmap_TCDM + offset, rows_per_core);
 
     }
 
@@ -44,7 +44,7 @@ int main() {
 
     if (CHECK_RESULTS == 1 && core_idx == 0) {
         for(uint32_t i = 0; i < total_elems; i++){
-            if(fabsf(ofmap_TCDM[i] - O_golden[i]) > EPS){
+            if(fabsf(ofmap_TCDM[i] - O_golden[i]) > (float) EPS){
                 err ++;
             }
         }

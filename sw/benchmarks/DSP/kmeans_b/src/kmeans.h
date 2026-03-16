@@ -1,4 +1,4 @@
-// Copyright 2024 ETH Zurich and University of Bologna.
+// Copyright 2 24 ETH Zurich and University of Bologna.
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -16,7 +16,7 @@ __thread float inf = INFINITY;
 
 float euclidean_distance_squared(uint32_t n_features, float* point1,
                                   float* point2) {
-    float sum = 0;
+    float sum = 0.0f;
     for (uint32_t i = 0; i < n_features; i++) {
         float diff = point1[i] - point2[i];
         sum += diff * diff;
@@ -186,15 +186,14 @@ static inline void kmeans_iteration(uint32_t n_samples_per_core,
 }
 
 void kmeans_job(kmeans_args_t* args) {
-    
 
     // Aliases
     uint32_t n_samples = args->n_samples;
     uint32_t n_features = args->n_features;
     uint32_t n_clusters = args->n_clusters;
     uint32_t n_iter = args->n_iter;
-    float* samples = (float*)(args->samples_addr);
-    float* centroids = (float*)(args->centroids_addr);
+    float* samples = args->samples_addr;
+    float* centroids = args->centroids_addr;
 
     // Distribute work
     uint32_t n_samples_per_cluster = n_samples / snrt_cluster_num();
@@ -202,41 +201,35 @@ void kmeans_job(kmeans_args_t* args) {
         n_samples_per_cluster / snrt_cluster_compute_core_num();
 
     // Dynamically allocate space in TCDM
-    float* local_samples = (float*)snrt_l1_alloc_cluster_local(
-        n_samples_per_cluster * n_features * sizeof(float), sizeof(float));
-    float* local_centroids = (float*)snrt_l1_alloc_cluster_local(
-        n_clusters * n_features * sizeof(float), sizeof(float));
-    uint32_t* membership = (uint32_t*)snrt_l1_alloc_cluster_local(
-        n_samples_per_cluster * sizeof(uint32_t), sizeof(uint32_t));
-    uint32_t* partial_membership_cnt =
-        (uint32_t*)snrt_l1_alloc_compute_core_local(
-            n_clusters * sizeof(uint32_t), sizeof(uint32_t));
-    // First core's partial centroids will store final centroids
-    float* partial_centroids = (float*)snrt_l1_alloc_compute_core_local(
-        n_clusters * n_features * sizeof(float), sizeof(float));
-    float* final_centroids = (float*)snrt_compute_core_local_ptr(
-        partial_centroids, 0, n_clusters * n_features * sizeof(float));
-    final_centroids =
-        (float*)snrt_remote_l1_ptr(final_centroids, snrt_cluster_idx(), 0);
+    float* local_samples = (float*)snrt_l1_next();
+    float* local_centroids = local_samples + n_samples_per_cluster * n_features; 
 
-    
+    uint32_t* membership = (uint32_t*)snrt_l1_next(); 
+    uint32_t* partial_membership_cnt =  membership + n_samples_per_cluster;
+            
+    // First core's partial centroids will store final centroids
+    float* partial_centroids = (float*)snrt_l1_next();
+    float* final_centroids = partial_centroids + n_clusters * n_features;
+
+    final_centroids = (float*)snrt_remote_l1_ptr(final_centroids, snrt_cluster_idx(), 0);
 
     // Transfer samples and initial centroids with DMA
+    size_t size_cluster;
     size_t size;
     size_t offset;
     if (snrt_is_dm_core()) {
-        size = n_samples_per_cluster * n_features;
-        offset = snrt_cluster_idx() * size;
+
+        size_cluster = n_samples_per_cluster * n_features * sizeof(float);
+        offset = snrt_cluster_idx() * size_cluster;
         snrt_dma_start_1d(local_samples, samples + offset,
-                          size * sizeof(float));
+                          size_cluster);
+
         size = n_clusters * n_features * sizeof(float);
-        snrt_dma_start_1d(local_centroids, centroids, size * sizeof(float));
+        snrt_dma_start_1d(local_centroids, centroids, size);
         snrt_dma_wait_all();
     }
 
     snrt_cluster_hw_barrier();
-
-    
 
     // Iterations of Lloyd's K-means algorithm
     for (uint32_t iter_idx = 0; iter_idx < n_iter; iter_idx++) {
@@ -250,7 +243,9 @@ void kmeans_job(kmeans_args_t* args) {
 
     // Transfer final centroids with DMA
     if (snrt_is_dm_core() && snrt_cluster_idx() == 0) {
-        snrt_dma_start_1d((void*)centroids, (void*)final_centroids, size);
+        snrt_dma_start_1d(centroids,final_centroids, size);
         snrt_dma_wait_all();
     }
+
+    return;
 }

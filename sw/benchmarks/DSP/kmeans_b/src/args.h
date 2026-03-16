@@ -12,6 +12,6 @@ typedef struct {
     uint32_t n_features;
     uint32_t n_clusters;
     uint32_t n_iter;
-    uint64_t samples_addr;
-    uint64_t centroids_addr;
+    float *samples_addr;
+    float *centroids_addr;
 } kmeans_args_t;

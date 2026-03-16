@@ -25,9 +25,9 @@ SN_RISCV_CFLAGS += --target=riscv32-unknown-elf
 # SN_RISCV_CFLAGS += -march=rv32imaf_xdma_xssr
 SN_RISCV_CFLAGS += -mabi=ilp32d	
 SN_RISCV_CFLAGS += -mcmodel=medany
-SN_RISCV_CFLAGS += -mno-fdiv
+#SN_RISCV_CFLAGS += -mno-fdiv
 SN_RISCV_CFLAGS += -fno-builtin-printf
-SN_RISCV_CFLAGS += -fno-builtin-sqrtf
+#SN_RISCV_CFLAGS += -fno-builtin-sqrtf
 SN_RISCV_CFLAGS += -fno-common
 SN_RISCV_CFLAGS += -fopenmp
 SN_RISCV_CFLAGS += -ftls-model=local-exec
