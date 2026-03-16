@@ -2,7 +2,7 @@
 
 #include "data.h"
 
-#include "layernorm.h"
+#include "layernorm_2.h"
 
 #include "snrt.h"
 

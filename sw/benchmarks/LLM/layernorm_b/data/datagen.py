@@ -2,8 +2,8 @@ import numpy as np
 import os
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-BATCH_SIZE  = 1
-SEQ_LEN     = 8     # must be multiple of ncores (8)
+BATCH_SIZE  = 2
+SEQ_LEN     = 16     # must be multiple of ncores (8)
 EMBEDDINGS  = 32    # must be multiple of 8 (UNROLL * num_elems_per_vector)
 EPS         = 1e-5  # float in C
 CHECK_RESULTS = True

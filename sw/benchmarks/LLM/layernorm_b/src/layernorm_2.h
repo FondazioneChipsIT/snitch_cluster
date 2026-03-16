@@ -13,7 +13,7 @@ void layernorm(float *input, float *output, uint32_t rows_core) {
     "flw ft10, 0(%[embeddings_f])\n" // Embeddings
     "flw ft11, 0(%[EPS])\n"  // EPS
     :
-    :[zero] "r"(&zero), [embeddings_f] "r" (&EMBEDDINGS), [EPS] "r"(&EPS)
+    :[zero] "r"(&zero), [embeddings_f] "r" (&embeddings_f), [EPS] "r"(&EPS)
     :"ft3", "ft4", "ft7", "ft10", "ft11");
 
     snrt_ssr_enable();
@@ -27,7 +27,6 @@ void layernorm(float *input, float *output, uint32_t rows_core) {
         snrt_ssr_loop_1d(SNRT_SSR_DM1, EMBEDDINGS, sizeof(float));
         snrt_ssr_write(SNRT_SSR_DM1, SNRT_SSR_1D, output + curr_row * EMBEDDINGS);
 
-        snrt_mcycle();
         asm volatile(
             // First frep for mean value
             "frep.o %[n_frep], 2, 0, 0 \n" 
@@ -52,14 +51,15 @@ void layernorm(float *input, float *output, uint32_t rows_core) {
             "fsub.s ft9, ft0, ft5 \n" // xi - mean
             "fdiv.s ft1, ft8, ft7 \n" // ft1 (output) = (xi-mean) / sqrt(var + eps)
             "fdiv.s ft1, ft9, ft7 \n" // ft1 (output) = (xi-mean) / sqrt(var + eps)
-            // Reset accumulator for next row
+            // Reset accumulators for next row
             "fsub.s ft4, ft4, ft4\n"
+            "fsub.s ft5, ft5, ft5\n"
             "fsub.s ft8, ft8, ft8\n"
             "fsub.s ft9, ft9, ft9\n"
             :
             : [n_frep] "r"(EMBEDDINGS/2-1)
             : "ft0", "ft1", "ft4", "ft5", "ft6", "ft7", "ft8", "ft9", "ft10", "ft11", "memory");
-        snrt_mcycle();
+
         snrt_fpu_fence();
     }
 
