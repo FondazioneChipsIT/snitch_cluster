@@ -25,7 +25,7 @@ csv_file = os.path.join(kernel_dir, f"{kernel_name}_results.csv")
 
 # Risali fino alla root di snitch_cluster
 current_dir = script_dir
-while os.path.basename(current_dir) != "snitch_cluster":
+while os.path.basename(current_dir) != "snitch_FP32":
     parent = os.path.dirname(current_dir)
     if parent == current_dir:
         raise FileNotFoundError("snitch_cluster non trovato nella gerarchia")

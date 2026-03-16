@@ -1,0 +1,18 @@
+Kernel: Layernorm
+Elements: 256
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     407        0.415    0.1572          1.1130         
+1     399        0.424    0.1604          0.4937         
+2     406        0.416    0.1576          0.4852         
+3     399        0.424    0.1604          0.4937         
+4     406        0.416    0.1576          0.4852         
+5     399        0.424    0.1604          0.4937         
+6     406        0.416    0.1576          0.4852         
+7     399        0.424    0.1604          0.4937         
+
+Cluster average:
+Cycles            : 402.62
+IPC               : 0.420
+FLOPs_alg/cycle   : 0.1590
+FLOPs_sust/cycle  : 0.5680
