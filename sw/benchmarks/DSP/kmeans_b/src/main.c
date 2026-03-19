@@ -10,8 +10,8 @@
 #include "kmeans.h"
 
 int main() {
-    kmeans_args_t args = {n_samples, n_features,        n_clusters,
-                          n_iter,    (float *)samples, (float *)centroids};
-    kmeans_job(&args);
+    // Chiamata diretta alla funzione passando i parametri via registri
+    kmeans_job(n_samples, n_features, n_clusters, n_iter, 
+               (float *)samples, (float *)centroids);
     return 0;
 }

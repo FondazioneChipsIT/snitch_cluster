@@ -1,251 +1,158 @@
-// Copyright 2 24 ETH Zurich and University of Bologna.
-// Licensed under the Apache License, Version 2.0, see LICENSE for details.
-// SPDX-License-Identifier: Apache-2.0
-//
-// Author: Luca Colagrande <colluca@iis.ee.ethz.ch>
-
 #include <stdint.h>
-
-#include "args.h"
 #include "math.h"
 #include "snrt.h"
 
-// Explicitly place in TCDM, through thread-local storage.
-// Otherwise every core loads it from DRAM.
+// Forziamo l'infinito in TCDM (importante per 32-bit per evitare fetch DRAM continui)
 __thread float inf = INFINITY;
 
-float euclidean_distance_squared(uint32_t n_features, float* point1,
-                                  float* point2) {
+// Funzione di distanza ottimizzata per 32-bit
+float euclidean_distance_squared(uint32_t n_features, float* p1, float* p2) {
     float sum = 0.0f;
     for (uint32_t i = 0; i < n_features; i++) {
-        float diff = point1[i] - point2[i];
+        float diff = p1[i] - p2[i];
         sum += diff * diff;
     }
     return sum;
 }
 
-static inline void kmeans_iteration(uint32_t n_samples_per_core,
-                                    uint32_t n_clusters, uint32_t n_features,
-                                    float* samples, uint32_t* membership,
-                                    uint32_t* partial_membership_cnt,
-                                    float* initial_centroids,
-                                    float* partial_centroids) {
-    // Distribute work
-    uint32_t start_sample_idx;
-    uint32_t end_sample_idx;
-    if (snrt_is_compute_core()) {
-        start_sample_idx = snrt_cluster_core_idx() * n_samples_per_core;
-        end_sample_idx = start_sample_idx + n_samples_per_core;
+void kmeans_job(uint32_t n_samples, uint32_t n_features, uint32_t n_clusters, 
+                uint32_t n_iter, float* samples, float* centroids) {
 
-        snrt_mcycle();
+    uint32_t cluster_id = snrt_cluster_idx();
+    uint32_t n_clusters_sys = snrt_cluster_num();
+    uint32_t n_cores_per_cluster = snrt_cluster_compute_core_num();
 
-        // Assignment step
-        for (uint32_t centroid_idx = 0; centroid_idx < n_clusters;
-             centroid_idx++) {
-            partial_membership_cnt[centroid_idx] = 0;
-        }
-        snrt_fpu_fence();
-        for (uint32_t sample_idx = start_sample_idx;
-             sample_idx < end_sample_idx; sample_idx++) {
-            float min_dist = inf;
-            membership[sample_idx] = 0;
+    // Distribuzione lavoro
+    uint32_t n_samples_per_cluster = n_samples / n_clusters_sys;
+    uint32_t n_samples_per_core = n_samples_per_cluster / n_cores_per_cluster;
 
-            for (uint32_t centroid_idx = 0; centroid_idx < n_clusters;
-                 centroid_idx++) {
-                float dist = euclidean_distance_squared(
-                    n_features, &samples[sample_idx * n_features],
-                    &initial_centroids[centroid_idx * n_features]);
-                if (dist < min_dist) {
-                    min_dist = dist;
-                    membership[sample_idx] = centroid_idx;
-                }
-            }
-            partial_membership_cnt[membership[sample_idx]]++;
-        }
-    }
-
+    // Gestione Memoria L1 (TCDM) - 32 bit alignment
+    // Usiamo offset in float (4 byte) per semplicità aritmetica
+    float* l1_ptr = (float*) snrt_l1_next();
     
+    float* local_samples          = l1_ptr;
+    float* local_centroids        = local_samples + (n_samples_per_cluster * n_features);
+    uint32_t* membership             = (uint32_t*) (local_centroids + (n_clusters * n_features));
+    uint32_t* partial_membership_cnt = (uint32_t*) (membership + n_samples_per_cluster);
+    float* partial_centroids      = (float*) (partial_membership_cnt + n_clusters);
 
-    // snrt_global_barrier();
-
-    
-
-    if (snrt_is_compute_core()) {
-        // Update step
-        for (uint32_t centroid_idx = 0; centroid_idx < n_clusters;
-             centroid_idx++) {
-            for (uint32_t feature_idx = 0; feature_idx < n_features;
-                 feature_idx++) {
-                // Initialize centroids to zero
-                // TODO: Can be optimized w/ DMA
-                partial_centroids[centroid_idx * n_features + feature_idx] = 0;
-            }
-        }
-        snrt_fpu_fence();
-        for (uint32_t sample_idx = start_sample_idx;
-             sample_idx < end_sample_idx; sample_idx++) {
-            for (uint32_t feature_idx = 0; feature_idx < n_features;
-                 feature_idx++) {
-                partial_centroids[membership[sample_idx] * n_features +
-                                  feature_idx] +=
-                    samples[sample_idx * n_features + feature_idx];
-            }
-        }
-    }
-
-    
-
-    snrt_cluster_hw_barrier();
-
-    
-
-    if (snrt_is_compute_core()) {
-        if (snrt_cluster_core_idx() == 0) {
-            // Intra-cluster reduction
-            for (uint32_t core_idx = 1;
-                 core_idx < snrt_cluster_compute_core_num(); core_idx++) {
-                // Pointers to variables of the other core
-                uint32_t* remote_partial_membership_cnt =
-                    (uint32_t*)snrt_compute_core_local_ptr(
-                        partial_membership_cnt, core_idx,
-                        n_clusters * sizeof(uint32_t));
-                float* remote_partial_centroids =
-                    (float*)snrt_compute_core_local_ptr(
-                        partial_centroids, core_idx,
-                        n_clusters * n_features * sizeof(float));
-                for (uint32_t centroid_idx = 0; centroid_idx < n_clusters;
-                     centroid_idx++) {
-                    // Accumulate membership counters
-                    partial_membership_cnt[centroid_idx] +=
-                        remote_partial_membership_cnt[centroid_idx];
-                    // Accumulate centroid features
-                    for (uint32_t feature_idx = 0; feature_idx < n_features;
-                         feature_idx++) {
-                        partial_centroids[centroid_idx * n_features +
-                                          feature_idx] +=
-                            remote_partial_centroids[centroid_idx * n_features +
-                                                     feature_idx];
-                    }
-                }
-            }
-
-            
-
-#if !defined(KMEANS_REDUCTION_ON_HOST)
-            snrt_inter_cluster_barrier();
-
-            if (snrt_cluster_idx() == 0) {
-                
-
-                // Inter-cluster reduction
-                for (uint32_t cluster_idx = 1; cluster_idx < snrt_cluster_num();
-                     cluster_idx++) {
-                    // Pointers to variables of remote clusters
-                    uint32_t* remote_partial_membership_cnt =
-                        (uint32_t*)snrt_remote_l1_ptr(partial_membership_cnt, 0,
-                                                      cluster_idx);
-                    float* remote_partial_centroids =
-                        (float*)snrt_remote_l1_ptr(partial_centroids, 0,
-                                                    cluster_idx);
-                    for (uint32_t centroid_idx = 0; centroid_idx < n_clusters;
-                         centroid_idx++) {
-                        // Accumulate membership counters
-                        partial_membership_cnt[centroid_idx] +=
-                            remote_partial_membership_cnt[centroid_idx];
-                        // Accumulate centroid features
-                        for (uint32_t feature_idx = 0; feature_idx < n_features;
-                             feature_idx++) {
-                            partial_centroids[centroid_idx * n_features +
-                                              feature_idx] +=
-                                remote_partial_centroids[centroid_idx *
-                                                             n_features +
-                                                         feature_idx];
-                        }
-                    }
-                }
-
-                
-
-                // Normalize
-                for (uint32_t centroid_idx = 0; centroid_idx < n_clusters;
-                     centroid_idx++) {
-                    for (uint32_t feature_idx = 0; feature_idx < n_features;
-                         feature_idx++) {
-                        partial_centroids[centroid_idx * n_features +
-                                          feature_idx] /=
-                            partial_membership_cnt[centroid_idx];
-                    }
-                }
-            }
-
-           
-#endif
-        }
-    }
-    snrt_mcycle();
-}
-
-void kmeans_job(kmeans_args_t* args) {
-
-    // Aliases
-    uint32_t n_samples = args->n_samples;
-    uint32_t n_features = args->n_features;
-    uint32_t n_clusters = args->n_clusters;
-    uint32_t n_iter = args->n_iter;
-    float* samples = args->samples_addr;
-    float* centroids = args->centroids_addr;
-
-    // Distribute work
-    uint32_t n_samples_per_cluster = n_samples / snrt_cluster_num();
-    uint32_t n_samples_per_core =
-        n_samples_per_cluster / snrt_cluster_compute_core_num();
-
-    // Dynamically allocate space in TCDM
-    float* local_samples = (float*)snrt_l1_next();
-    float* local_centroids = local_samples + n_samples_per_cluster * n_features; 
-
-    uint32_t* membership = (uint32_t*)snrt_l1_next(); 
-    uint32_t* partial_membership_cnt =  membership + n_samples_per_cluster;
-            
-    // First core's partial centroids will store final centroids
-    float* partial_centroids = (float*)snrt_l1_next();
-    float* final_centroids = partial_centroids + n_clusters * n_features;
-
-    final_centroids = (float*)snrt_remote_l1_ptr(final_centroids, snrt_cluster_idx(), 0);
-
-    // Transfer samples and initial centroids with DMA
-    size_t size_cluster;
-    size_t size;
-    size_t offset;
+    // --- CARICAMENTO INIZIALE DMA ---
     if (snrt_is_dm_core()) {
-
-        size_cluster = n_samples_per_cluster * n_features * sizeof(float);
-        offset = snrt_cluster_idx() * size_cluster;
-        snrt_dma_start_1d(local_samples, samples + offset,
-                          size_cluster);
-
-        size = n_clusters * n_features * sizeof(float);
-        snrt_dma_start_1d(local_centroids, centroids, size);
+        // Correzione Offset: samples è float*, quindi l'offset è in numero di elementi
+        uint32_t offset = cluster_id * n_samples_per_cluster * n_features;
+        size_t sample_size = n_samples_per_cluster * n_features * sizeof(float);
+        size_t centroid_size = n_clusters * n_features * sizeof(float);
+        // Carica i campioni di competenza del cluster
+        snrt_dma_start_1d(local_samples, &samples[offset], sample_size);
+        
+        // Carica i centroidi iniziali (tutti i cluster leggono gli stessi)
+        snrt_dma_start_1d(local_centroids, centroids, centroid_size);
+        
         snrt_dma_wait_all();
     }
-
     snrt_cluster_hw_barrier();
 
-    // Iterations of Lloyd's K-means algorithm
-    for (uint32_t iter_idx = 0; iter_idx < n_iter; iter_idx++) {
-        kmeans_iteration(n_samples_per_core, n_clusters, n_features,
-                         local_samples, membership, partial_membership_cnt,
-                         local_centroids, partial_centroids);
-        snrt_global_barrier();
-        local_centroids = final_centroids;
+    // --- LOOP ALGORITMO ---
+    for (uint32_t iter = 0; iter < n_iter; iter++) {
         
+        // 1. Fase di assegnamento (Computation)
+        if (snrt_is_compute_core()) {
+            uint32_t core_id = snrt_cluster_core_idx();
+            uint32_t start_idx = core_id * n_samples_per_core;
+            uint32_t end_idx = start_idx + n_samples_per_core;
+
+            // Reset contatori parziali
+            for (uint32_t i = 0; i < n_clusters; i++) {
+                partial_membership_cnt[i] = 0;
+                for (uint32_t j = 0; j < n_features; j++)
+                    partial_centroids[i * n_features + j] = 0.0f;
+            }
+
+            for (uint32_t i = start_idx; i < end_idx; i++) {
+                float min_dist = inf;
+                uint32_t best_cluster = 0;
+
+                for (uint32_t c = 0; c < n_clusters; c++) {
+                    float dist = euclidean_distance_squared(n_features, 
+                                 &local_samples[i * n_features], 
+                                 &local_centroids[c * n_features]);
+                    if (dist < min_dist) {
+                        min_dist = dist;
+                        best_cluster = c;
+                    }
+                }
+                membership[i] = best_cluster;
+                partial_membership_cnt[best_cluster]++;
+                
+                // Accumulo parziale locale al core
+                for (uint32_t f = 0; f < n_features; f++) {
+                    partial_centroids[best_cluster * n_features + f] += 
+                        local_samples[i * n_features + f];
+                }
+            }
+        }
+
+        snrt_cluster_hw_barrier();
+
+        // 2. Riduzione Intra-Cluster (Core 0 aggrega i dati degli altri core)
+        if (snrt_is_compute_core() && snrt_cluster_core_idx() == 0) {
+            for (uint32_t c_idx = 1; c_idx < n_cores_per_cluster; c_idx++) {
+                uint32_t* rem_cnt = (uint32_t*) snrt_compute_core_local_ptr(partial_membership_cnt, c_idx, 0);
+                float* rem_centroids = (float*) snrt_compute_core_local_ptr(partial_centroids, c_idx, 0);
+                
+                for (uint32_t i = 0; i < n_clusters; i++) {
+                    partial_membership_cnt[i] += rem_cnt[i];
+                    for (uint32_t j = 0; j < n_features; j++) {
+                        partial_centroids[i * n_features + j] += rem_centroids[i * n_features + j];
+                    }
+                }
+            }
+        }
+
+        snrt_inter_cluster_barrier();
+
+        // 3. Riduzione Inter-Cluster (Solo Cluster 0 aggrega tutto e normalizza)
+        if (cluster_id == 0 && snrt_is_compute_core() && snrt_cluster_core_idx() == 0) {
+            for (uint32_t cl_idx = 1; cl_idx < n_clusters_sys; cl_idx++) {
+                uint32_t* rem_cnt = (uint32_t*) snrt_remote_l1_ptr(partial_membership_cnt, 0, cl_idx);
+                float* rem_centroids = (float*) snrt_remote_l1_ptr(partial_centroids, 0, cl_idx);
+                
+                for (uint32_t i = 0; i < n_clusters; i++) {
+                    partial_membership_cnt[i] += rem_cnt[i];
+                    for (uint32_t j = 0; j < n_features; j++) {
+                        partial_centroids[i * n_features + j] += rem_centroids[i * n_features + j];
+                    }
+                }
+            }
+
+            // Normalizzazione: Calcolo media finale (nuovi centroidi)
+            for (uint32_t i = 0; i < n_clusters; i++) {
+                if (partial_membership_cnt[i] > 0) {
+                    for (uint32_t j = 0; j < n_features; j++) {
+                        partial_centroids[i * n_features + j] /= partial_membership_cnt[i];
+                    }
+                }
+            }
+        }
+
+        snrt_inter_cluster_barrier();
+
+        // 4. BROADCAST: Copia i nuovi centroidi da Cluster 0 a tutti i local_centroids
+        // Questo risolve il problema RegWriteKnown dell'iterazione successiva
+        if (snrt_is_dm_core()) {
+            float* src_new_centroids = (float*) snrt_remote_l1_ptr(partial_centroids, 0, 0);
+            size_t centroid_size = n_clusters * n_features * sizeof(float);
+            snrt_dma_start_1d(local_centroids, src_new_centroids, centroid_size);
+            snrt_dma_wait_all();
+        }
+        
+        snrt_cluster_hw_barrier();
     }
 
-    // Transfer final centroids with DMA
-    if (snrt_is_dm_core() && snrt_cluster_idx() == 0) {
-        snrt_dma_start_1d(centroids,final_centroids, size);
+    // --- SCRITTURA FINALE ---
+    if (cluster_id == 0 && snrt_is_dm_core()) {
+        size_t centroid_size = n_clusters * n_features * sizeof(float);
+        snrt_dma_start_1d(centroids, local_centroids, centroid_size);
         snrt_dma_wait_all();
     }
-
-    return;
 }

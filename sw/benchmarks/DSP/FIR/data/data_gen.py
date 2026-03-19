@@ -2,8 +2,8 @@ import numpy as np
 import os
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-LEN        = 256
-FILTER_LEN = 32    # number of taps actually used (must be <= LEN)
+LEN        = 1024
+FILTER_LEN = 64    # number of taps actually used (must be <= LEN)
 
 # ── Random input signal and filter coefficients ───────────────────────────────
 rng = np.random.default_rng(42)
@@ -39,8 +39,8 @@ with open(file_path, "w") as f:
     f.write("#define DATA_H\n\n")
 
     f.write("/* FIR filter – causal convolution, left-border handled by reducing tap count */\n")
-    f.write(f"#define LEN        {LEN}\n")
-    f.write(f"#define FILTER_LEN {FILTER_LEN}\n\n")
+    f.write(f"uint32_t LEN = {LEN};\n")
+    f.write(f"uint32_t FILTER_LEN = {FILTER_LEN};\n\n")
 
     f.write("/* TCDM pointers – filled at runtime by DM core */\n")
     f.write("float *x;\n")

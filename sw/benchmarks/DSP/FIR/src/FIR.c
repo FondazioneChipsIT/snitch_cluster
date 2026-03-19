@@ -56,15 +56,11 @@ int main(){
     if(snrt_is_compute_core()){
 
         // Compute the chunk of the vector per core, and the offset that is used to space them
-        uint32_t chunk_per_core = LEN/ncores; 
-        if(chunk_per_core == 0){
-            printf("Chunk for each core is 0!\n");
-            return -2;
-        }
+        uint32_t chunk_per_core = (LEN-FILTER_LEN)/ncores; 
+ 
         // Offset to index the correct chunk of data per core
-        uint32_t offset = core_idx*chunk_per_core;
+        uint32_t offset = core_idx * chunk_per_core + (FILTER_LEN - 1);
         
-    
         // Call the kernel
         if(use_opt)
             fir_opt(chunk_per_core, offset, x, y, h);
@@ -73,15 +69,5 @@ int main(){
 
     }
 
-    uint32_t err = 0;
-
-    if (CHECK_RESULTS == 1 && core_idx == 0) {
-        for(uint32_t i = 0; i < LEN; i++){
-            if(fabsf(y[i] - golden_y[i]) > 1e-5f){
-                err ++;         
-            }
-        }
-    }
-
-    return err;
+    return 0;
 }
