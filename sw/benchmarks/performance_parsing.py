@@ -83,6 +83,7 @@ if not csv_exists:
 # ============================
 cycles_list = []
 ipc_list = []
+fpu_util_list = []
 flops_alg_list = []
 flops_sust_list = []
 
@@ -120,7 +121,8 @@ for core_id, file_path in enumerate(files):
     section = match.group(1)
     cycles = int(re.search(r"^\s*cycles\s+(\d+)", section, re.M).group(1))
     ipc = float(re.search(r"^\s*total_ipc\s+([\d\.]+)", section, re.M).group(1))
-
+    fpu_util = float(re.search(r"^\s*fpss_fpu_occupancy\s+([\d\.]+)", section, re.M).group(1))
+    
     # ------------------------
     # CONTO FLOP
     # ------------------------
@@ -149,6 +151,7 @@ for core_id, file_path in enumerate(files):
     # ------------------------
     cycles_list.append(cycles)
     ipc_list.append(ipc)
+    fpu_util_list.append(fpu_util)
     flops_alg_list.append(flops_alg_per_cycle)
     flops_sust_list.append(flops_sust_per_cycle)
 
@@ -168,10 +171,13 @@ for core_id, file_path in enumerate(files):
 # MEDIE CLUSTER
 # ============================
 log_print("\nCluster average:")
-log_print(f"Cycles            : {sum(cycles_list)/len(cycles_list):.2f}")
-log_print(f"IPC               : {sum(ipc_list)/len(ipc_list):.3f}")
-log_print(f"FLOPs_alg/cycle   : {sum(flops_alg_list)/len(flops_alg_list):.4f}")
-log_print(f"FLOPs_sust/cycle  : {sum(flops_sust_list)/len(flops_sust_list):.4f}")
+log_print(f"Cycles mean             : {sum(cycles_list)/len(cycles_list):.2f}")
+log_print(f"Total cycles            : {sum(cycles_list):.2f}")
+log_print(f"IPC                     : {sum(ipc_list)/len(ipc_list):.3f}")
+log_print(f"FPU Utilization         : {sum(fpu_util_list)/len(fpu_util_list):.3f}")
+# Old FLOP count
+#log_print(f"FLOPs_alg/cycle   : {sum(flops_alg_list)/len(flops_alg_list):.4f}")
+#log_print(f"FLOPs_sust/cycle  : {sum(flops_sust_list)/len(flops_sust_list):.4f}")
 
 txt.close()
 csv_f.close()

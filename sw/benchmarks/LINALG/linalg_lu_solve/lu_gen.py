@@ -50,7 +50,7 @@ def write_header(filename, A, piv):
         f.write("};\n")
 
 def main():
-    elems = 32  # <-- Modifica la dimensione della matrice qui
+    elems = 64  # <-- Modifica la dimensione della matrice qui
     A = generate_matrix(elems)
     LU, piv = lu_decomposition(A)
     

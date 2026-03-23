@@ -3,7 +3,7 @@
 
 // Matrix elems (for now only a multiple of ncores, default 8)
 #ifndef elems
-#define elems 32
+#define elems 64
 #endif
 
 // TCDM pointers to our data

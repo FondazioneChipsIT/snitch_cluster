@@ -2,7 +2,7 @@ import numpy as np
 import os
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-elems = 8   # matrix dimension (square)
+elems = 64   # matrix dimension (square)
 
 # ── Generate random SPD matrix ────────────────────────────────────────────────
 # A = R^T * R with R random upper-triangular + large diagonal → guaranteed SPD

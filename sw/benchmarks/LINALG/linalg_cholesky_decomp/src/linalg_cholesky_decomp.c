@@ -5,7 +5,7 @@
 #include "data.h"
 #include "ch_decomp_opt.h"
 
-uint32_t CHECK_RESULTS = 0;
+uint32_t CHECK_RESULTS = 1;
 
 int main() {
     uint32_t core_idx = snrt_cluster_core_idx();
