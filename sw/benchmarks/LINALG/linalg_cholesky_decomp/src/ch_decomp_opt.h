@@ -3,56 +3,76 @@
 
 snrt_barrier_t barr;
 
-void ch_decomp_opt(uint32_t core_idx, uint32_t ncores,
+void cholesky_opt(uint32_t core_idx, uint32_t ncores,
                    float *src, float *dst, uint32_t dim){
-    snrt_mcycle();
 
+    snrt_mcycle();
     for (uint32_t m = 0; m < dim; m++) {
 
-        /* === Diagonal element === */
-        uint32_t left = m % ncores;
-        uint32_t block = m / ncores;
-        uint32_t start = core_idx * block + (core_idx < left ? core_idx : left);
-        uint32_t end = start + block + (core_idx < left ? 1 : 0);
-
-    
-        local_sum[core_idx] = 0.0f;
-        for (uint32_t n = start; n < end; n++) {
-            float x = dst[m*dim + n];
-            local_sum[core_idx] += x * x;
-        }
-    
-
-       snrt_partial_barrier(&barr, 8);
-
+        // Only core 0 computes the diagonal element
         if (core_idx == 0) {
             float sum = 0.0f;
-            for (uint32_t c = 0; c < ncores; c++)
-                sum += local_sum[c];
-            dst[m*dim + m] = sqrtf(dst[m*dim + m] - sum);
+
+            // Use ssrs only when m is big enough
+            if( m>7 ){
+                
+                snrt_ssr_loop_1d(SNRT_SSR_DM0, m, sizeof(float));
+                snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, dst + m*dim);
+
+                snrt_ssr_enable();
+
+                asm volatile(
+                "fmv.s.x ft3,x0\n"
+                "frep.o %[n_frep], 1, 0, 0 \n" 
+                "fmadd.s ft3, ft0, ft0, ft3\n" 
+                "fsw ft3, 0(%[sum])\n" //storeback
+                :
+                : [n_frep] "r"(m - 1), [sum] "r"(&sum)
+                : "ft0", "ft3" "memory");
+
+                snrt_ssr_disable();
+                snrt_fpu_fence();
+
+            }else{
+                for (uint32_t k = 0; k < m; k++) {
+                    float v = dst[m*dim + k];
+                    sum += v * v;
+                }
+            }
+
+            float diag = src[m*dim + m] - sum;
+
+            // SAFE GUARD, avoid possible Nan/inf 
+            if (diag <= 0.0f) {
+                diag = 1e-12f;
+            }
+
+            dst[m*dim + m] = sqrtf(diag);
         }
 
+        // Other cores wait for the diagonal element to be computed before proceeding
         snrt_partial_barrier(&barr, 8);
-     
-        
-        /* === Column update === */
+
         float lmm = dst[m*dim + m];
-        float lmm_inv = 1.0f / (float) lmm;
+        float inv_lmm = 1.0f / lmm;
 
-        uint32_t col_left = (dim - (m + 1)) % ncores;
-        uint32_t col_block = (dim - (m + 1)) / ncores;
-        uint32_t col_start = core_idx * col_block + (core_idx < col_left ? core_idx : col_left) + (m + 1);
-        uint32_t col_end = col_start + col_block + (core_idx < col_left ? 1 : 0);
+        // Divide the work
+        uint32_t total_elems = dim - (m + 1);
+        uint32_t chunk_per_core = total_elems / ncores;
+        uint32_t rem   = total_elems % ncores;
 
-        for (uint32_t n = col_start; n < col_end; n++) {
-            float sum1 = 0.0;
-            asm volatile (
-                "flw ft3, 0(%0)" 
-                :
-                : "r"(&sum1) 
-                : "ft3");
-            // Avoid doing frep 64K times, maybe it is good!
-            if(m>0){
+        // We start from m+1 because the first m elements of the column are already computed
+        // At the end of the diag computation (core zero if)
+        uint32_t start = (m + 1) + core_idx * chunk_per_core + (core_idx < rem ? core_idx : rem);
+        // Split the remaining elements among first 7 cores, the eight core will never get another elment
+        uint32_t end   = start + chunk_per_core + (core_idx < rem ? 1 : 0);
+
+        for (uint32_t n = start; n < end; n++) {
+
+            float sum = 0.0f;
+
+            // dot product corretto
+            if( m > 7){
                 snrt_ssr_loop_1d(SNRT_SSR_DM0, m, sizeof(float));
                 snrt_ssr_loop_1d(SNRT_SSR_DM1, m, sizeof(float));
 
@@ -62,6 +82,7 @@ void ch_decomp_opt(uint32_t core_idx, uint32_t ncores,
                 snrt_ssr_enable();
 
                 asm volatile(
+                    "fmv.s.x ft3,x0\n"
                     "frep.o %[n_frep], 1, 0, 0\n"
                     "fmadd.s ft3, ft0, ft1, ft3\n"
                     :
@@ -75,18 +96,24 @@ void ch_decomp_opt(uint32_t core_idx, uint32_t ncores,
                 asm volatile(
                     "fsw ft3, 0(%0)" 
                     :
-                    : "r"(&sum1) 
+                    : "r"(&sum) 
                     : "memory");
 
-                
+
+            }else{
+                for (uint32_t k = 0; k < m; k++) {
+                    sum += dst[n*dim + k] * dst[m*dim + k];
+                }
             }
-            dst[n*dim + m] = (float) (src[n*dim + m] - sum1) * (float) lmm_inv;
+            
+            float val = src[n*dim + m] - sum;
+            dst[n*dim + m] = val * inv_lmm;
         }
 
-        
-
+        // Barrier to avoid that core 0 starts to compute the next diagonal element before all the elements of the current column are computed
         snrt_partial_barrier(&barr, 8);
     }
 
     snrt_mcycle();
+    return;
 }

@@ -40,7 +40,6 @@ with open(file_path, "w") as f:
     f.write("/* TCDM pointers – filled at runtime by DM core */\n")
     f.write("float *mat;\n")
     f.write("float *dst;\n\n")
-    f.write("float local_sum[16];\n\n")
 
     f.write("/* Input: random symmetric positive-definite matrix (row-major) */\n")
     f.write(matrix_to_c_array("mat_data", mat) + "\n")
