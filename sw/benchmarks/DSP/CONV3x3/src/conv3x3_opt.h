@@ -19,9 +19,10 @@ void conv3x3_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
         asm volatile(
             "flw ft3, 0(%[zero])\n"
             "flw ft4, 0(%[zero])\n"
+            "flw ft5, 0(%[zero])\n"
             :
             : [zero] "r"(&zero)
-            : "ft3", "ft4", "memory");
+            : "ft3", "ft4", "ft5", "memory");
 
         // Read 3 elements of x (stride 1), move to the next row (stride FM_ROWS),
         // repeat this process 3 time (9 elements). Then read all elements of 
@@ -49,27 +50,27 @@ void conv3x3_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
         snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, y + offset*(FM_ROWS-2));
 
         asm volatile(  
-        "frep.o %[n_frep], 12, 0, 0 \n" // Repeat chunk times
+        "frep.o %[n_frep], 14, 0, 0 \n" // Repeat chunk times
         "fsub.s ft3, ft3, ft3\n"   // acc = 0
         "fsub.s ft4, ft4, ft4 \n"  // acc2= 0
+        "fsub.s ft5, ft5, ft5 \n"  // acc3= 0
         "fmadd.s ft3, ft0, ft1, ft3\n" // 9 time like the filter size, need to change for CONV5 or 7
         "fmadd.s ft4, ft0, ft1, ft4\n"
+        "fmadd.s ft5, ft0, ft1, ft5\n"
         "fmadd.s ft3, ft0, ft1, ft3\n"
         "fmadd.s ft4, ft0, ft1, ft4\n"
+        "fmadd.s ft5, ft0, ft1, ft5\n"
         "fmadd.s ft3, ft0, ft1, ft3\n"
         "fmadd.s ft4, ft0, ft1, ft4\n"
-        "fmadd.s ft3, ft0, ft1, ft3\n"
-        "fmadd.s ft4, ft0, ft1, ft4\n"
-        "fmadd.s ft3, ft0, ft1, ft3\n" 
-        "fadd.s ft2, ft3, ft4\n"     // storeback
+        "fmadd.s ft5, ft0, ft1, ft5\n" 
+        "fadd.s ft3, ft3, ft4\n"     // storeback
+        "fadd.s ft2, ft3, ft5\n"     // storeback
         :
         : [n_frep] "r"(tot_ops-1)
-        : "ft0", "ft1", "ft2", "ft3", "ft4", "memory");
+        : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "memory");
 
         snrt_ssr_disable();
         snrt_fpu_fence();
-
-
         
     }
     snrt_mcycle();

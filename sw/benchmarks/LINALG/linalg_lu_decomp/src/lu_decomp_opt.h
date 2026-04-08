@@ -1,49 +1,6 @@
 // Luca Colombo Chips-IT 2025
 // Optimized version with SSR and FREP
 
-
-/* fully optimized version with SSR and FREP 
-# LU decomposition 8x8 performance
-# Mean cycles: 9060
-# Mean FLOP/cycle: 0.044736
-# Total FLOP/cycle: 0.357887
-*/
-
-
-/* fully optimized version with SSR and FREP 
-# LU decomposition 16x16 performance
-# Mean cycles: 19926
-# Mean FLOP/cycle: 0.149884
-# Total FLOP/cycle: 1.199074
-*/
-
-/* fully optimized version with SSR and FREP 
-# LU decomposition 32x32 performance
-# Mean cycles: 52049
-# Mean FLOP/cycle: 0.439377
-# Total FLOP/cycle: 3.515013
-
-*/
-
-/* fully optimized version with SSR and FREP 
- LU decomposition 40x40 performance
-# Mean cycles: 74326
-# Mean FLOP/cycle: 0.595574
-# Total FLOP/cycle: 4.764588
-*/
-
-
-/*
-# LU decomposition 64x64 performance
-# Mean cycles: 172504
-# Mean FLOP/cycle: 1.036836
-# Total FLOP/cycle: 8.294684
-*/
-
-// Use optimized row swap with SSR and FREP 
-// FOR 32x32 MATRIX we do not get a real benefit from this optimization
-// so can roll back to naive swap if needed
-// for 40x40 or larger matrices this is beneficial, slightly better than naive
 #include "matrix_swap_rows_opt2.h"
 
 // in case we need the simple version, for elems <32

@@ -91,6 +91,8 @@ SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/softmax_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_cholesky_decomp
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_lu_decomp
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_lu_solve
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/gemm
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/gemv
 
 
 endif

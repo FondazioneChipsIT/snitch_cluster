@@ -1,121 +1,99 @@
-// Luca Colombo Chips-IT 2025
-/* DWT filter */
+// Luca Colombo — Chips-IT 2025
+// DWT benchmark: 40-tap filter, 1000 inputs, 1155 outputs, 4 decomposition levels
 
-// Snitch runtime library
 #include "snrt.h"
 #include "data.h"
 #include "DWT_opt.h"
-
-void dwt_naive(uint32_t chunk_per_core, uint32_t offset,
-               float *x, float *y_low, float *y_high,
-               float *h, float *g){
-    snrt_mcycle();
-    for (uint32_t n = 0; n < chunk_per_core; n++) {
-
-        uint32_t out = offset + n;
-        uint32_t center = 2 * out;
-
-        /* Numero di tap effettivi (gestione bordo sinistro) */
-        uint32_t taps = (center < FILTER_LEN) ? (center + 1) : FILTER_LEN;
-
-        float acc_low  = 0.0f;
-        float acc_high = 0.0f;
-
-        /*
-         * Convoluzione:
-         * x[center - k] * h[k]
-         * x[center - k] * g[k]
-         */
-        for (uint32_t k = 0; k < taps; k++) {
-            float sample = x[center - k];
-            acc_low  += sample * h[k];
-            acc_high += sample * g[k];
-        }
-
-        y_low[out]  = acc_low;
-        y_high[out] = acc_high;
-    }
-    snrt_mcycle();
-}
+#include "golden.h"
 
 bool use_opt = 1;
 
 int main(){
-    // Core ID and core count
     uint32_t core_idx = snrt_cluster_core_idx();
-    uint32_t ncores = snrt_cluster_compute_core_num();
+    uint32_t ncores   = snrt_cluster_compute_core_num();
 
-    // DM core allocates memory in TCDM and initializes the vectors
-    if(snrt_is_dm_core()){
+    // ── DM core: allocate TCDM and initialise data ──────────────────────────
+    if (snrt_is_dm_core()) {
 
-        // Pointers to TCDM memory, spaced by LEN 
-        x = (float *)snrt_l1_next();
-        y_low = x + LEN;
-        y_high = y_low + LEN/2;
-        h = y_high + LEN/2;
-        g = h + FILTER_LEN;
+        float *mem = (float *)snrt_l1_next();
 
-        // If pointers are null -> break
-        if (!x || !y_low || !y_high || !h || !g) {
-            printf("Memory allocation failed!\n");
-            return -1;
-        } 
+        // Input signal
+        x = mem; 
+        mem += LEN;
 
-        // Initialize the values of vectors, can change as you like
-        for(uint32_t i = 0; i<LEN; i++){
+        // Low/high output buffers for each decomposition level
+        for (int j = 0; j < DWT_LEVELS; j++) {
+            low[j]  = mem; 
+            mem += dwt_out_len[j];
+            high[j] = mem; 
+            mem += dwt_out_len[j];
+        }
+
+        // Analysis filters
+        h = mem; 
+        mem += FILTER_LEN;
+        g = mem; 
+        mem += FILTER_LEN;
+
+        // Initialise input: x[i] = i
+        for (uint32_t i = 0; i < LEN; i++)
             x[i] = (float)i;
-        }
-        /* Haar
-        h[0] = 1.0;
-        h[1] = 0.0;
 
-        g[0] = 0.0;
-        g[1] = 1.0;*/
+        // Low-pass: box filter  h[k] = 1/FILTER_LEN
+        for (int i = 0; i < FILTER_LEN; i++)
+            h[i] = 1.0f / FILTER_LEN;
 
-        /* DB4
+        // High-pass: quadrature mirror  g[k] = (-1)^k * h[L-1-k]
+        for (int i = 0; i < FILTER_LEN; i++)
+            g[i] = ((i & 1) ? -1.0f : 1.0f) * h[FILTER_LEN - 1 - i];
 
-        h[0] =  0.4829629131445341;
-        h[1] =  0.8365163037378079;
-        h[2] =  0.2241438680420134;
-        h[3] = -0.1294095225512604;
-
-        g[0] = -0.1294095225512604;
-        g[1] = -0.2241438680420134;
-        g[2] =  0.8365163037378079;
-        g[3] = -0.4829629131445341;*/
-
-        // Daubechies-16 low-pass (analysis)
-        size_t size = FILTER_LEN * sizeof(float);
-        snrt_dma_start_1d(h, h_L2, size);
-        snrt_dma_wait_all();
-        
-        // High pass
-        for (int k = 0; k < 32; k++) {
-            g[k] = ((k & 1) ? -1.0f : 1.0f) * h[31 - k];
-        }
-
-
+        // Check golden
+        golden_compute();
     }
 
-    snrt_cluster_hw_barrier(); // Barrier syncronization
+    snrt_cluster_hw_barrier(); 
 
-    // Only the compute cores do something
-    if(snrt_is_compute_core()){
+    // ── Compute cores: 4-level DWT ──────────────────────────────────────────
+    // Each level: parallelise the out_len[j] output samples across ncores.
+    // A cluster barrier between levels ensures low[j] is fully written before
+    // it is used as input to level j+1.
 
-        // Compute the chunk of the vector per core, and the offset that is used to space them
-        uint32_t dwt_len = LEN / 2;
-        uint32_t chunk_per_core = dwt_len / ncores;
-        uint32_t offset = core_idx * chunk_per_core;
+    snrt_mcycle();
+    for (int level = 0; level < DWT_LEVELS; level++) {
 
-        // Call the kernel
-        if(use_opt)
-            dwt_opt(chunk_per_core, offset, x, y_low, y_high, h, g);
-        else
-            dwt_naive(chunk_per_core, offset, x, y_low, y_high, h, g);
+        if (snrt_is_compute_core()) {
+
+            uint32_t cur_in  = dwt_in_len[level];
+            uint32_t cur_out = dwt_out_len[level];
+
+            // Input for this level: original x at level 0, low-pass of
+            // previous level afterwards
+            float *cur_x = (level == 0) ? x : low[level - 1];
+
+            // Work-sharing: distribute cur_out samples across cores.
+            // Remainder samples are assigned to the first `rem` cores
+            // (each gets one extra), so every sample is covered.
+            uint32_t chunk  = cur_out / ncores;
+            uint32_t rem    = cur_out % ncores;
+            uint32_t core_chunk  = chunk + (core_idx < rem ? 1u : 0u);
+            uint32_t offset = core_idx * chunk
+                                 + (core_idx < rem ? core_idx : rem);
+           
+            dwt_opt  (core_chunk, offset, cur_x,
+                        low[level], high[level], h, g, cur_in);
+          
+        }
+
+        // Barrier between levels — DM core participates to keep cluster in sync
+        snrt_cluster_hw_barrier();
     }
+    snrt_mcycle();
 
-
+    if(core_idx == 0) {
+        // Check results
+        uint32_t errs = golden_verify();
+        return (errs == 0) ? 0 : -1;
+    }
 
     return 0;
 }
-

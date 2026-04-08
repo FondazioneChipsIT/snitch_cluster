@@ -16,8 +16,7 @@ OPT? more like better not to use ssrs in this case
 
 */
 
-snrt_barrier_t barr;
-
+snrt_barrier_t barr2;
 void lu_solve_opt(uint32_t core_idx, uint32_t ncores, uint64_t *offset_cycle, uint64_t *end_cycle, 
                 float *mat, uint32_t *perm, float *y, float *vec, float *result) {
 
@@ -82,7 +81,7 @@ void lu_solve_opt(uint32_t core_idx, uint32_t ncores, uint64_t *offset_cycle, ui
         
 
 
-        snrt_partial_barrier(&barr, 8);
+        snrt_partial_barrier(&barr2, 8);
 
         // Core 0 sums, not parallelizable
         if (core_idx == 0) {
@@ -95,10 +94,10 @@ void lu_solve_opt(uint32_t core_idx, uint32_t ncores, uint64_t *offset_cycle, ui
         }
         
         // Wait for new ys
-        snrt_partial_barrier(&barr, 8);
+        snrt_partial_barrier(&barr2, 8);
     }
 
-    snrt_partial_barrier(&barr, 8);
+    snrt_partial_barrier(&barr2, 8);
 
 
     // BACKWARD SUBSTITUTION (U * result = y)
@@ -160,7 +159,7 @@ void lu_solve_opt(uint32_t core_idx, uint32_t ncores, uint64_t *offset_cycle, ui
             : "ft3");
         
 
-        snrt_partial_barrier(&barr, 8);
+        snrt_partial_barrier(&barr2, 8);
 
         // Core 0 sums
         if (core_idx == 0) {
@@ -170,7 +169,7 @@ void lu_solve_opt(uint32_t core_idx, uint32_t ncores, uint64_t *offset_cycle, ui
             result[m] = (y[m] - sum) / mat[m * elems + m];
         }
      
-        snrt_partial_barrier(&barr, 8);
+        snrt_partial_barrier(&barr2, 8);
     }
 
     *end_cycle = snrt_mcycle();

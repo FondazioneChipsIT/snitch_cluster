@@ -10,31 +10,6 @@
 #include "lu_solve_opt.h"
 #include "lu_solve_naive.h"
 
-// FOR DEBUG PURPOSE
-void lu_solve_serial(float *mat, uint32_t *perm, float *y_ref, float *vec, float *x_ref) {
-    for (uint32_t i=0;i<elems;i++){ y_ref[i] = 0.0f; x_ref[i]=0.0f; }
-
-    printf("=== SERIAL DEBUG FORWARD ===\n");
-    for (uint32_t m = 0; m < elems; m++) {
-        float sum = 0.0f;
-        for (uint32_t k = 0; k < m; k++) sum += mat[(size_t)m * elems + k] * y_ref[k];
-        y_ref[m] = vec[perm[m]] - sum;
-        // printf("m=%u: perm=%u vec=%12.6g sum=%12.6g y[%u]=%12.6g\n", m, perm[m], vec[perm[m]], sum, m, y_ref[m]);
-    }
-
-    printf("=== SERIAL DEBUG BACKWARD ===\n");
-    for (int m = (int)elems - 1; m >= 0; m--) {
-        float sum = 0.0f;
-        for (uint32_t k = m+1; k < elems; k++) sum += mat[(size_t)m * elems + k] * x_ref[k];
-        float diag = mat[(size_t)m * elems + m];
-        if (diag == 0.0f) printf("ZERO DIAG AT m=%d\n", m);
-        x_ref[m] = (y_ref[m] - sum) / diag;
-        // printf("m=%d: diag=%12.6g sum=%12.6g result[%d]=%12.6g\n", m, diag, sum, m, x_ref[m]);
-    }
-}
-
-// Use optimized or naive version
-uint32_t use_opt = 1;
 
 int main() {
     uint32_t core_idx = snrt_cluster_core_idx();
@@ -71,16 +46,14 @@ int main() {
     }
 
     snrt_cluster_hw_barrier();
+    snrt_mcycle(); 
 
-    // kernel call for every core as there are barriers
-
-    if(snrt_is_compute_core()) {
-        if(use_opt == 1)
-            lu_solve_opt(core_idx, ncores, &start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec, y, vec, result);
-        else
-            lu_solve_naive(&start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec, y, vec, result, local_sum);
-
+    if(snrt_is_compute_core()){
+        lu_solve_naive(mat, perm_vec, y, vec, result, local_sum);
     }
+
+    snrt_cluster_hw_barrier();
+    snrt_mcycle();
     
     return 0;
 }

@@ -4,9 +4,9 @@ from sklearn.datasets import make_blobs
 from sklearn.cluster import KMeans
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-n_samples  = 512    # must be multiple of 8
-n_features = 2
-n_clusters = 3
+n_samples  = 100    # must be multiple of 8
+n_features = 8
+n_clusters = 8
 seed       = 42
 max_iter   = 100
 
@@ -48,11 +48,7 @@ def vec_to_c(name, arr, aligned=True):
 script_dir = os.path.dirname(os.path.abspath(__file__))
 file_path  = os.path.join(script_dir, "data.h")
 
-with open(file_path, "w") as f:
-    f.write("// Copyright 2026 ETH Zurich and University of Bologna.\n")
-    f.write("// Licensed under the Apache License, Version 2.0, see LICENSE for details.\n")
-    f.write("// SPDX-License-Identifier: Apache-2.0\n\n")
-
+with open(file_path, "w") as f:    
     f.write(f"uint32_t n_samples = {n_samples};\n\n")
     f.write(f"uint32_t n_features = {n_features};\n\n")
     f.write(f"uint32_t n_clusters = {n_clusters};\n\n")

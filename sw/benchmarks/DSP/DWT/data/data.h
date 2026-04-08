@@ -1,52 +1,42 @@
 #ifndef DATA_H
 #define DATA_H
-// TCDM pointers to our data
-float *x,*y_low, *y_high,*h,*g;
-// If you exceed TCDM size you get 0 as result
-// Max size is 128KB/8bytes (64bits for floats) = 16k theoretically -> 8K theoretical for each vector!
-// but in reality only 4120
-// Vector length
+
+// ──── Benchmark parameters ──────────────────────────────────────────────────
 #ifndef LEN
-#define LEN 32
+#define LEN        1000   // input samples
 #endif
 
-// Filter length
 #ifndef FILTER_LEN
-#define FILTER_LEN 32
+#define FILTER_LEN  40    // 40-coefficient filter
 #endif
 
-// High filter in L2
-float h_L2[FILTER_LEN] = {0.0544158422430816f,
-    0.3128715909142999f,
-    0.6756307362972898f,
-    0.5853546836548691f,
-    -0.0158291052563493f,
-    -0.2840155429615824f,
-    0.0004724845739979f,
-    0.1287474266204893f,
-    -0.0173693010018090f,
-    -0.0440882539307971f,
-    0.0139810279173995f,
-    0.0087460940474065f,
-    -0.0048703529934520f,
-    -0.0003917403733770f,
-    0.0006754494064506f,
-    -0.0001174767841248f,
-    -0.0001174767841248f,
-    0.0006754494064506f,
-    -0.0003917403733770f,
-    -0.0048703529934520f,
-    0.0087460940474065f,
-    0.0139810279173995f,
-    -0.0440882539307971f,
-    -0.0173693010018090f,
-    0.1287474266204893f,
-    0.0004724845739979f,
-    -0.2840155429615824f,
-    -0.0158291052563493f,
-    0.5853546836548691f,
-    0.6756307362972898f,
-    0.3128715909142999f,
-    0.0544158422430816f
-};
-#endif
+#define DWT_LEVELS   4
+
+// ──── Output lengths per level ──────────────────────────────────────────────
+// out_len[j] = floor((in_len[j] + FILTER_LEN - 1) / 2)
+// Level 0: (1000 + 39) / 2 = 519
+// Level 1: ( 519 + 39) / 2 = 279
+// Level 2: ( 279 + 39) / 2 = 159
+// Level 3: ( 159 + 39) / 2 = 99
+// Total outputs (DWT coefficients): 519 + 279 + 159 + 99 + 99 = 1155
+#define OUT_LEN_0  ((LEN       + FILTER_LEN - 1) / 2)   // 519
+#define OUT_LEN_1  ((OUT_LEN_0 + FILTER_LEN - 1) / 2)   // 279
+#define OUT_LEN_2  ((OUT_LEN_1 + FILTER_LEN - 1) / 2)   // 159
+#define OUT_LEN_3  ((OUT_LEN_2 + FILTER_LEN - 1) / 2)   // 99
+
+#define TOTAL_OUTPUTS \
+    (OUT_LEN_0 + OUT_LEN_1 + OUT_LEN_2 + OUT_LEN_3 + OUT_LEN_3)  // 1155
+
+// ──── Global TCDM pointers ──────────────────────────────────────────────────
+float *x;                      // original input  [LEN]
+float *low[DWT_LEVELS];        // low-pass outputs [OUT_LEN_j]
+float *high[DWT_LEVELS];       // high-pass outputs[OUT_LEN_j]
+float *h, *g;                  // analysis filters [FILTER_LEN]
+
+// ──── Compile-time lookup tables (used in main) ─────────────────────────────
+static const uint32_t dwt_in_len[DWT_LEVELS]  = {LEN,      OUT_LEN_0,
+                                                  OUT_LEN_1, OUT_LEN_2};
+static const uint32_t dwt_out_len[DWT_LEVELS] = {OUT_LEN_0, OUT_LEN_1,
+                                                  OUT_LEN_2, OUT_LEN_3};
+
+#endif // DATA_H
