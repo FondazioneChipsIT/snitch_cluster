@@ -16,4 +16,4 @@ static inline float multiply_opt(float multiplicand, float multiplier) {
 
 
 #include "gemm/src/gemm.h"
-#include "gemv/src/gemv.h"
+#include "gemv/src/gemv_opt.h"

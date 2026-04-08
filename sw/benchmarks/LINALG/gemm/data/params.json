@@ -15,11 +15,11 @@
     double_buffer: 0,
     partition_banks: 0,
     transa: false,
-    transb: false, // must be true for SIMD
+    transb: true, // must be true for SIMD
     m: 32,
     n: 16,
     k: 16,
     alpha: 1,
     beta: 0,
-    gemm_fp: "gemm_fp64_opt"
+    gemm_fp: "gemm_fp32_naive_unrolled"
 }

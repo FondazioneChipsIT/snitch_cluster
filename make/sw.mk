@@ -93,6 +93,7 @@ SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_lu_decomp
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_lu_solve
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/gemm
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/gemv
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/gemvt
 
 
 endif
