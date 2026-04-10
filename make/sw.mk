@@ -79,6 +79,7 @@ SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/DWT
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/FFT
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/FIR
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/kmeans_b
+
 # LLM kernels
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/matmul_fp32
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/residual
@@ -86,14 +87,16 @@ SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/attention_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/gelu_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/layernorm_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/softmax_b
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LLM/encoder
 
 #LINALG kernels
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_cholesky_decomp
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_lu_decomp
 SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_lu_solve
-SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/gemm
-SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/gemv
-SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/gemvt
+#SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_svd_jacobi
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_gemm
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_gemv
+SN_APPS += $(SN_ROOT)/sw/benchmarks/LINALG/linalg_gemvt
 
 
 endif

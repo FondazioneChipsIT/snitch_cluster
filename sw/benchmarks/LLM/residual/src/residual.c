@@ -6,24 +6,6 @@
 #include "data.h"
 #include "residual_opt.h"
 
-void residual_naive(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
-    float *x, float *y, float *out){
-    
-    snrt_mcycle();
-
-    // Chunk per core is the number of rows, we need the total amount
-    uint32_t tot_ops = chunk_per_core*LEN;
-
-    for (uint32_t i = offset; i<offset + tot_ops; i++){
-
-        out[i] = x[i]+y[i];
-
-    }
-    snrt_mcycle();
-}
-
-bool use_opt = 1;
-
 int main(){
     // Core ID and core count
     uint32_t core_idx = snrt_cluster_core_idx();
@@ -33,20 +15,13 @@ int main(){
 
         // Pointers to TCDM memory, spaced by LEN 
         x = (float *)snrt_l1_next();
-        out = x + LEN*LEN;
-        y = out + LEN*LEN;
+        out = x + M*N;
+        y = out + M*N;
 
-        // If pointers are null -> break
-        if (!x || !y || !out) {
-            printf("Memory allocation failed!\n");
-            return -1;
-        } 
-
-        // Initialize the values of vectors, can change as you like
-        for(uint32_t i = 0; i<LEN*LEN; i++){
-            x[i] = (float)i;
-            y[i] = (float)i;
-        }
+        size_t size = M * N * sizeof(float);
+        snrt_dma_start_1d(x, mat_a, size);
+        snrt_dma_start_1d(y, mat_b, size);
+        snrt_dma_wait_all();
 
     }
 
@@ -57,18 +32,27 @@ int main(){
 
         // Compute the chunk of the matrix, represents
         // the number of rows each core has to use
-        uint32_t chunk_per_core = LEN/ncores;
+        uint32_t chunk_per_core = M/ncores;
         // Offset to index the correct chunk of data per core
         uint32_t offset = core_idx*chunk_per_core;
 
-        // We call the residual kernel
-        if(use_opt)
-            residual_opt(core_idx,chunk_per_core, offset, x, y, out);
-        else
-            residual_naive(core_idx,chunk_per_core, offset, x, y, out);
+        residual_opt(core_idx,chunk_per_core, offset, x, y, out);
+
     }
 
-    return 0;
-}
+    snrt_cluster_hw_barrier(); // Barrier syncronization
 
-/* NEVER USE FLOAT TYPE! BREAKS EVERYTHING! */
+    uint32_t err = 0;
+    float eps = 1e-5f;
+
+    if (core_idx == 0) {
+        for(uint32_t i = 0; i < M * N; i++){
+            if(fabsf(out[i] - golden[i]) > eps){
+                err ++;
+            }
+        }
+        printf("Errors: %u\n", err);
+    }
+
+    return err;
+}

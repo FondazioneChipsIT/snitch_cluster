@@ -7,31 +7,6 @@
 /* Print first/last elements  */
 uint32_t CHECK_RESULTS = 1;
 
-uint32_t use_opt = 1;
-
-void matmul_simple_f32(uint32_t chunk_per_core, uint32_t offset,
-                    float *mat_a_TCDM, float* mat_b_TCDM, float *dst_TCDM){
-    
-    snrt_mcycle();
-
-    for (int i = offset; i < offset + chunk_per_core; ++i) {
-        for (int j = 0; j < elems; ++j) {
-            float acc = 0.0;
-
-            for (int k = 0; k < elems; ++k) {
-                acc += mat_a_TCDM[i * elems + k] * mat_b_TCDM[k * elems + j];
-            }
-
-            dst_TCDM[i * elems + j] = acc;
-        }
-    }
-
-    snrt_mcycle();
-
-    return;
-}
-
-
 int main() {
     uint32_t core_idx = snrt_cluster_core_idx();
     uint32_t ncores = snrt_cluster_compute_core_num();
@@ -41,19 +16,16 @@ int main() {
 
 
         mat_a_TCDM = (float *)snrt_l1_next();
-        mat_b_TCDM = mat_a_TCDM + elems * elems;
-        dst_TCDM = mat_b_TCDM + elems * elems;
+        mat_b_TCDM = mat_a_TCDM + M * K;
+        dst_TCDM = mat_b_TCDM + K * N;
 
-        if (!mat_a_TCDM || !mat_b_TCDM || !dst_TCDM) {
-            printf("Memory allocation failed!\n");
-            return -1;
-        }
+        size_t size_a = M * K * sizeof(float);
+        size_t size_b = K * N * sizeof(float);
+        size_t size_dst = M * N * sizeof(float);
 
-        size_t size = elems * elems * sizeof(float);
-
-        snrt_dma_start_1d(mat_a_TCDM, mat_a, size);
-        snrt_dma_start_1d(mat_b_TCDM, mat_b, size);
-        snrt_dma_start_1d(dst_TCDM, golden, size);
+        snrt_dma_start_1d(mat_a_TCDM, mat_a, size_a);
+        snrt_dma_start_1d(mat_b_TCDM, mat_b, size_b);
+        snrt_dma_start_1d(dst_TCDM, golden, size_dst);
         snrt_dma_wait_all();
     }
 
@@ -62,21 +34,16 @@ int main() {
     // Only the compute cores do something
     if(snrt_is_compute_core()){
 
-        /* calculate chunks per core */
-        uint32_t chunk_per_core = elems / ncores;
+        /* calculate chunks per core, split the columns of the b matrix */
+        uint32_t chunk_per_core = N / ncores;
 
         /* compute offset for this core */
         uint32_t offset = core_idx * chunk_per_core;
-
-        if (chunk_per_core == 0) {
-            if (core_idx == 0) printf("ERROR: chunk_per_core == 0 (increase matrix size or reduce ncores)\n");
-            return 0;
-        }
-
-        if(use_opt==1) 
-            matrix_mul_opt(chunk_per_core,offset, mat_a_TCDM, mat_b_TCDM, dst_TCDM);
-        else
-            matmul_simple_f32(chunk_per_core,offset, mat_a_TCDM, mat_b_TCDM, dst_TCDM);
+        uint32_t m = M;
+        uint32_t n = N;
+        uint32_t k = K;
+        
+        matrix_mul_opt(chunk_per_core,offset, mat_a_TCDM, mat_b_TCDM, dst_TCDM, m, n, k);
 
     }
 
@@ -87,7 +54,7 @@ int main() {
 
     if (CHECK_RESULTS == 1 && core_idx == 0) {
         asm("nop \n");
-        for(uint32_t i = 0; i < elems * elems; i++){
+        for(uint32_t i = 0; i < M * N; i++){
             if(fabsf(dst_TCDM[i] - golden[i]) > eps){
                 err ++;
             }

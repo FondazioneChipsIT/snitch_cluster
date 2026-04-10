@@ -17,14 +17,12 @@ OPT? more like better not to use ssrs in this case
 */
 
 snrt_barrier_t barr2;
-void lu_solve_opt(uint32_t core_idx, uint32_t ncores, uint64_t *offset_cycle, uint64_t *end_cycle, 
-                float *mat, uint32_t *perm, float *y, float *vec, float *result) {
+void lu_solve_opt(float *mat, uint32_t *perm, float *y, float *vec, float *result, float *local_sum) {
 
     float zero = 0.0f;
+    uint32_t core_idx = snrt_cluster_core_idx();
+    uint32_t ncores   = snrt_cluster_compute_core_num();
     uint32_t perm_idx;
-
-    // Start cycle count
-    *offset_cycle = snrt_mcycle();
     
     // -------------------------
     // FORWARD SUBSTITUTION (L * y = P * vec)
@@ -172,7 +170,6 @@ void lu_solve_opt(uint32_t core_idx, uint32_t ncores, uint64_t *offset_cycle, ui
         snrt_partial_barrier(&barr2, 8);
     }
 
-    *end_cycle = snrt_mcycle();
 }
 
     

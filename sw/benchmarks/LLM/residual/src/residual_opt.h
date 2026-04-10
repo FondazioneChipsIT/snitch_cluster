@@ -7,7 +7,7 @@ void residual_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
     snrt_mcycle();
 
     // Chunk per core is the number of rows, we need the total amount
-    uint32_t tot_ops = chunk_per_core*LEN;
+    uint32_t tot_ops = chunk_per_core*N; // number of elements to process per core
 
     // Setup the 1d loop with ssr (tell which streams to use, the size and the size of
     // the elements)
@@ -16,10 +16,10 @@ void residual_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
     snrt_ssr_loop_1d(SNRT_SSR_DM2, tot_ops, sizeof(float));
 
     // Read from ft0 and ft1 that will be wired to a and b 
-    snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, x + offset*LEN); //ft0->x
-    snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, y + offset*LEN); //ft1->y
+    snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, x + offset*N); //ft0->x
+    snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, y + offset*N); //ft1->y
     // Write to ft2 (out)
-    snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, out + offset*LEN); //ft2->out
+    snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, out + offset*N); //ft2->out
    
     // Enable the SSRs
     snrt_ssr_enable();

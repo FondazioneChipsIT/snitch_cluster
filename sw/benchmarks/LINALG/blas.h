@@ -13,7 +13,3 @@ static inline float multiply_opt(float multiplicand, float multiplier) {
     else
         return 0.0f;
 }
-
-
-#include "gemm/src/gemm.h"
-#include "gemv/src/gemv_opt.h"

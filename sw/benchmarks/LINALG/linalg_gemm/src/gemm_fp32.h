@@ -1,0 +1,86 @@
+// Luca Colombo Chips-IT 2026
+// GEMM with C = alpha* A*B + beta*C
+void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
+                    float alpha, float beta,
+                    float *mat_a, float* mat_b, float *mat_c,
+                    uint32_t m, uint32_t n, uint32_t k){
+
+    float zero = 0.0f; // Zero register
+
+    snrt_mcycle();
+    
+    // Read the mat_a matrix with a 1 stride-> access a row
+    snrt_ssr_loop_1d(SNRT_SSR_DM0, m*k, sizeof(float));
+
+    // Read the mat_b matrix with a k stride-> access a column (in memory the matrix is put
+    // row after row)
+    snrt_ssr_loop_1d(SNRT_SSR_DM1, k, n*sizeof(float)); 
+
+    // we cannot write C with ssrs as we need to read it, SSRs are unidirectional
+
+    /* Load zero into ft3, used as accumulator */
+    asm volatile(
+    "flw ft3, 0(%[zero])\n"
+    "flw ft4, 0(%[zero])\n"
+    "flw ft5, 0(%[zero])\n"
+    "flw ft6, 0(%[zero])\n"
+    "flw ft7, 0(%[alpha])\n"
+    :
+    : [zero] "r"(&zero), [alpha] "r"(&alpha)
+    : "ft3", "ft4", "ft5", "ft6", "ft7", "ft8");
+
+    snrt_ssr_enable();
+
+    // Columns of mat_b, chunk_per_core times
+    for(uint32_t cols = 0; cols < chunk_per_core; cols++){
+        // All rows of mat_a, all for each column of mat b
+        // Read all rows of mat_a, one at a time, with stride 1, so we get a row of mat_a in each iteration
+        snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, mat_a);
+        
+        for(uint32_t rows = 0; rows < m; rows++){
+            // As for the column the read is easy as it is only offset+rows (stored as rows)
+            snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, mat_b + cols + offset);
+
+            // Explicit read of c_val, already multiplied by beta
+            float beta_c_val = beta * mat_c[cols + offset + rows*(size_t)n];
+            asm volatile(
+            "flw ft8, 0(%[beta_c_val])\n"
+            :: [beta_c_val] "r"(&beta_c_val)
+            : "ft8", "memory");
+
+            asm volatile(
+                "frep.o %[n_frep], 4, 0, 0 \n"  /* Repeat elems times: ft3 = ft0 (mat_a) * ft1 (mat_b) + ft3 (acc)*/
+                "fmadd.s ft3, ft0, ft1, ft3\n"
+                "fmadd.s ft4, ft0, ft1, ft4\n"
+                "fmadd.s ft5, ft0, ft1, ft5\n"
+                "fmadd.s ft6, ft0, ft1, ft6\n"
+
+                "fadd.s ft3, ft3, ft4\n" /* Store back result in dst ft2 (dst) = ft3 (result) + ft4 (0) */
+                "fadd.s ft5, ft5, ft3\n" 
+                "fadd.s ft9, ft5, ft6\n" 
+
+                "fmul.s ft9, ft9, ft7\n" /* Multiply by alpha, ft2 = alpha *A*B */
+                "fadd.s ft9, ft9, ft8\n" /* Add beta * c_val, ft2 = alpha *A*B + beta * C_val */
+
+                "fsw ft9, 0(%[dst])\n" /* Store result in dst */
+
+                "fsub.s ft3, ft3, ft3\n" // Reset accs
+                "fsub.s ft4, ft4, ft4\n"
+                "fsub.s ft5, ft5, ft5\n"
+                "fsub.s ft6, ft6, ft6\n"
+                : 
+                : [n_frep] "r"(k/4 - 1),  [dst] "+r"(mat_c + cols + offset + rows*(size_t)n)
+                : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "ft8", "memory");
+
+                snrt_fpu_fence(); /* Ensure all stores are visible before next iteration */
+               
+        }    
+
+    }
+    snrt_ssr_disable();
+    snrt_fpu_fence();
+    
+    snrt_mcycle();
+
+    return;
+}

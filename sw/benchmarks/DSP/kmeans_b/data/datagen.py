@@ -4,9 +4,9 @@ from sklearn.datasets import make_blobs
 from sklearn.cluster import KMeans
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-n_samples  = 100    # must be multiple of 8
-n_features = 8
-n_clusters = 8
+n_samples  = 64    # must be multiple of 8
+n_features = 2
+n_clusters = 2
 seed       = 42
 max_iter   = 100
 

@@ -29,14 +29,11 @@ int main (){
         n_clusters * n_features * sizeof(float), sizeof(float));
     uint32_t* membership = (uint32_t*)snrt_l1_alloc_cluster_local(
         n_samples_per_cluster * sizeof(uint32_t), sizeof(uint32_t));
-    uint32_t* partial_membership_cnt =
-        (uint32_t*)snrt_l1_alloc_compute_core_local(
-            n_clusters * sizeof(uint32_t), sizeof(uint32_t));
+    // Allocate in the cores
+    uint32_t* partial_membership_cnt = (uint32_t*)snrt_l1_next(); 
     // First core's partial centroids will store final centroids
-    float* partial_centroids = (float*)snrt_l1_alloc_compute_core_local(
-        n_clusters * n_features * sizeof(float), sizeof(float));
-    float* final_centroids = (float*)snrt_compute_core_local_ptr(
-        partial_centroids, 0, n_clusters * n_features * sizeof(float));
+    float* partial_centroids = (float*)(partial_membership_cnt + n_clusters * sizeof(uint32_t));
+    float* final_centroids = partial_centroids + n_clusters * n_features;
     final_centroids =
         (float*)snrt_remote_l1_ptr(final_centroids, snrt_cluster_idx(), 0);
 
@@ -54,7 +51,6 @@ int main (){
     }
 
     snrt_cluster_hw_barrier();
-
     snrt_mcycle();
 
     if(snrt_is_compute_core()) {
@@ -65,13 +61,11 @@ int main (){
                             local_centroids, partial_centroids);
             snrt_global_barrier();
             local_centroids = final_centroids;
-            snrt_mcycle();
         }
     }
-   
-    snrt_mcycle();
 
     snrt_cluster_hw_barrier();
+    snrt_mcycle();
 
     // Transfer final centroids with DMA
     /*if (snrt_is_dm_core()) {

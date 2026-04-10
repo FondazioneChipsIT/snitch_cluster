@@ -18,9 +18,8 @@ void lu_solve_naive(float *mat, uint32_t *perm, float *y, float *vec, float *res
         
         // reset buffer
         local_sum[core_idx] = 0.0f;
-        
-
-            // numero di elementi da sommare: k in [0, m)
+    
+        // numero di elementi da sommare: k in [0, m)
         uint32_t count = m; // può essere 0
         uint32_t block = count / (uint32_t)ncores;
         uint32_t left  = count % (uint32_t)ncores;
@@ -50,17 +49,13 @@ void lu_solve_naive(float *mat, uint32_t *perm, float *y, float *vec, float *res
         snrt_partial_barrier(&barr, 8);
     }
 
-    snrt_partial_barrier(&barr, 8);
-
-
     // BACKWARD SUBSTITUTION (U * result = y)
     
-    for (uint32_t m = (uint32_t) elems - 1; m >=0; m--) {
+    for (int m = (int) elems - 1; m >=0; m--) {
        
         local_sum[core_idx] = 0.0f;
         
-
-            // la finestra su cui sommare è k in [m+1, elems)
+         // la finestra su cui sommare è k in [m+1, elems)
         uint32_t count = (uint32_t)elems - (m + 1); // numero elementi nella finestra, può essere 0
         uint32_t block = count / (uint32_t)ncores;
         uint32_t left  = count % (uint32_t)ncores;
@@ -87,7 +82,6 @@ void lu_solve_naive(float *mat, uint32_t *perm, float *y, float *vec, float *res
      
         snrt_partial_barrier(&barr, 8);
     }
-
 
     return;
 }

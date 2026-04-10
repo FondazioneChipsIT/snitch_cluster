@@ -1,0 +1,18 @@
+Kernel: GEMVT
+Elements: 128x128
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     7273       0.312    0.5632          0.5984         
+1     7273       0.312    0.5632          0.5808         
+2     7273       0.312    0.5632          0.5808         
+3     7273       0.312    0.5632          0.5808         
+4     7273       0.312    0.5632          0.5808         
+5     7273       0.312    0.5632          0.5808         
+6     7273       0.312    0.5632          0.5808         
+7     7273       0.312    0.5632          0.5808         
+
+Cluster average:
+Cycles mean             : 7273.00
+Total cycles            : 58184.00
+IPC                     : 0.312
+FPU Utilization         : 0.299

@@ -1,0 +1,18 @@
+Kernel: LU_SOLVE_naive
+Elements: 64x64
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     83619      0.169    0.0134          0.0264         
+1     83619      0.134    0.0130          0.0130         
+2     83619      0.132    0.0126          0.0126         
+3     83619      0.130    0.0122          0.0122         
+4     83619      0.128    0.0119          0.0119         
+5     83619      0.127    0.0115          0.0115         
+6     83619      0.126    0.0111          0.0111         
+7     83619      0.124    0.0107          0.0107         
+
+Cluster average:
+Cycles mean             : 83619.00
+Total cycles            : 668952.00
+IPC                     : 0.134
+FPU Utilization         : 0.009
