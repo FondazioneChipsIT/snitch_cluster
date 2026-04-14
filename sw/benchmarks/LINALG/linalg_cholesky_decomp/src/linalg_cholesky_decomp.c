@@ -27,11 +27,13 @@ int main() {
     }
 
     snrt_cluster_hw_barrier();
-
+    snrt_mcycle();
     // kernel call
     if(snrt_is_compute_core()){
         cholesky_opt(core_idx, ncores, mat, dst, elems);
     }
+    snrt_cluster_hw_barrier();
+    snrt_mcycle();
 
     uint32_t err = 0;
 

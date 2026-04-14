@@ -1,9 +1,9 @@
 #ifndef DATA_H
 #define DATA_H
 
-#define M 128
-#define N 128
-#define K 128
+#define M 64
+#define N 64
+#define K 64
 
 float *mat_a_TCDM;
 float *mat_b_TCDM;

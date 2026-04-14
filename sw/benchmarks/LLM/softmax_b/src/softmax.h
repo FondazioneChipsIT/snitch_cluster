@@ -7,8 +7,6 @@
 
 void softmax_FP32(float *input, float *output, uint32_t row_stride, uint32_t batch_offset, uint32_t batch_size, uint32_t seq_len, uint32_t input_samples) {
 
-    snrt_mcycle();
-
     float max_core, sum;
 
     for (uint32_t b = 0; b < batch_size; b++) {
@@ -36,8 +34,6 @@ void softmax_FP32(float *input, float *output, uint32_t row_stride, uint32_t bat
             }
         }
     }
-
-    snrt_mcycle();
 
     return;
 }

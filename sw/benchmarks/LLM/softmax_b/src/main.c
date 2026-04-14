@@ -31,6 +31,7 @@ int main() {
     }
 
     snrt_cluster_hw_barrier();
+    snrt_mcycle();
 
     // Only the compute cores do something
     if(snrt_is_compute_core()){
@@ -54,7 +55,8 @@ int main() {
     }
 
     snrt_cluster_hw_barrier();
-
+    snrt_mcycle();
+    
     uint32_t err = 0;
     float eps = 1e-5f;
 

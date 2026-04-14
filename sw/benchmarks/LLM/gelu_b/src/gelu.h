@@ -56,6 +56,7 @@ static inline float sigmoid_gelu_fp32(float x, float a, float b) {
 
 // Single-cluster GeLU
 static inline void gelu_fp32(float *input, float *output, uint32_t size) {
+    snrt_snrt_cluster_hw_barrier();
     snrt_mcycle();
     if (snrt_is_compute_core()) {
         for (uint32_t i = 0; i < size; i++) {
@@ -63,6 +64,7 @@ static inline void gelu_fp32(float *input, float *output, uint32_t size) {
             // output[i] = gelu_activation_fp32(input[i]);
         }
     }
+    snrt_snrt_cluster_hw_barrier();
     snrt_mcycle();
 }
 

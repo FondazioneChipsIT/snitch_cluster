@@ -44,6 +44,7 @@ int main() {
     }
 
     snrt_cluster_hw_barrier();
+    snrt_mcycle();
 
     // kernel call
     if(snrt_is_compute_core()) {
@@ -54,6 +55,8 @@ int main() {
             lu_decomp_naive(core_idx, ncores, &start_cycle[core_idx], &end_cycle[core_idx], mat, perm_vec);
     }
 
-    
+    snrt_cluster_hw_barrier();
+    snrt_mcycle();
+ 
     return 0;
 }

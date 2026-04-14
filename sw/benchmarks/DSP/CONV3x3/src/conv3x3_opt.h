@@ -7,7 +7,6 @@ void conv3x3_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
 
     float zero = 0.0f; 
     
-    snrt_mcycle();
     // Check if last two cores, for 6 need 2 rows at least and 7 3
     if(core_idx < 6 || (chunk_per_core > 1 && core_idx == 6) || (chunk_per_core > 2 && core_idx == 7)){
 
@@ -73,6 +72,6 @@ void conv3x3_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
         snrt_fpu_fence();
         
     }
-    snrt_mcycle();
+    
     return;
 }

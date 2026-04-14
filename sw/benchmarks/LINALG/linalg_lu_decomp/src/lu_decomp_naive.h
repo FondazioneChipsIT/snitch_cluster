@@ -46,7 +46,6 @@ static inline void swap_rows_simple(float *mat, uint32_t n, uint32_t r1, uint32_
 
 void lu_decomp_naive(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, uint64_t *end_cycle, 
                             float *mat, int *perm) {
-    *start_cycle = snrt_mcycle();
 
     for (uint32_t k = 0; k < elems; k++) {
 
@@ -111,5 +110,4 @@ void lu_decomp_naive(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, 
         snrt_partial_barrier(&barr, 8);
     }
 
-    *end_cycle = snrt_mcycle();
 }

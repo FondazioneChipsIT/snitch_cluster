@@ -43,8 +43,6 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
     : [zero] "r"(&zero)
     : "ft5");
 
-    // Start cycle count
-    *start_cycle = snrt_mcycle();
 
     for (uint32_t k = 0; k < elems; k++) {
 
@@ -159,7 +157,7 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
 
     }
         
-    *end_cycle = snrt_mcycle();
+    return;
 }
 
     

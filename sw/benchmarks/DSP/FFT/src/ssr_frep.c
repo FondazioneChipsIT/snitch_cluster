@@ -10,7 +10,6 @@ static float *fft_inner(uint32_t N, float *x, float *y, float *twiddle) {
 	uint32_t core_num = snrt_cluster_compute_core_num();
 	float *tmp;
 	
-	snrt_mcycle();
 	snrt_ssr_enable();
 	
 	for (uint32_t n = N, s = 1; n > 1; n /= 2, s *= 2) {
@@ -75,7 +74,6 @@ static float *fft_inner(uint32_t N, float *x, float *y, float *twiddle) {
 	}
 
 	snrt_ssr_disable();
-	snrt_mcycle();
 
 	return x;
 }

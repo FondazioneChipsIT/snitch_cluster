@@ -31,13 +31,16 @@ int main() {
     }
 
     snrt_cluster_hw_barrier();
-
+    snrt_mcycle();
     // kernel call
     uint_32t err = 0;
 
     if(snrt_is_compute_core()){
         err = svd_jacobi_opt(mat, mat_V, vec_S, M);
     }
+
+    snrt_cluster_hw_barrier();
+    snrt_mcycle();
 
     return err;
 }

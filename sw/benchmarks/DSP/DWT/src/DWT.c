@@ -87,6 +87,7 @@ int main(){
         // Barrier between levels — DM core participates to keep cluster in sync
         snrt_cluster_hw_barrier();
     }
+    snrt_cluster_hw_barrier();
     snrt_mcycle();
 
     if(core_idx == 0) {

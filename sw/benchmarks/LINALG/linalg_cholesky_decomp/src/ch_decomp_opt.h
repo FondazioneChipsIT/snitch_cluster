@@ -6,7 +6,6 @@ snrt_barrier_t barr;
 void cholesky_opt(uint32_t core_idx, uint32_t ncores,
                    float *src, float *dst, uint32_t dim){
 
-    snrt_mcycle();
     for (uint32_t m = 0; m < dim; m++) {
 
         // Only core 0 computes the diagonal element
@@ -114,6 +113,5 @@ void cholesky_opt(uint32_t core_idx, uint32_t ncores,
         snrt_partial_barrier(&barr, 8);
     }
 
-    snrt_mcycle();
     return;
 }

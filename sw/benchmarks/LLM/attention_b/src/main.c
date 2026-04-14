@@ -49,6 +49,7 @@ int main() {
     }
 
     snrt_cluster_hw_barrier();
+    snrt_mcycle();
 
     if (snrt_is_compute_core()) {
         flashattention_2_fp32(
@@ -58,7 +59,8 @@ int main() {
     }
 
     snrt_cluster_hw_barrier();
-
+    snrt_mcycle();
+    
     if (snrt_is_dm_core()) {
         snrt_dma_start_1d(O, O_TCDM, L * D * sizeof(float));
         snrt_dma_wait_all();

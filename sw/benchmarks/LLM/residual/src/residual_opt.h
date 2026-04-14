@@ -4,8 +4,6 @@
 void residual_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
     float *x, float *y, float *out){
 
-    snrt_mcycle();
-
     // Chunk per core is the number of rows, we need the total amount
     uint32_t tot_ops = chunk_per_core*N; // number of elements to process per core
 
@@ -36,9 +34,6 @@ void residual_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
     snrt_ssr_disable();
     // Fence for FPU syncronization
     snrt_fpu_fence();
-
-
-    snrt_mcycle();
-
+    
     return;
 }

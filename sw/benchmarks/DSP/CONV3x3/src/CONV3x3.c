@@ -31,7 +31,8 @@ int main(){
 
     }
 
-    snrt_cluster_hw_barrier(); // Barrier syncronization
+    snrt_cluster_hw_barrier();
+    snrt_mcycle();
 
     // Only the compute cores do something
     if(snrt_is_compute_core()){
@@ -39,11 +40,6 @@ int main(){
         // Compute the chunk of the matrix, represents
         // the number of rows each core has to use
         uint32_t chunk_per_core = FM_ROWS/ncores;
-
-        if(chunk_per_core == 0){
-            printf("Chunk for each core is 0!\n");
-            return -2;
-        }
         // Offset to index the correct chunk of data per core
         uint32_t offset = core_idx*chunk_per_core;
         
@@ -55,7 +51,8 @@ int main(){
 
     }
 
-    snrt_cluster_hw_barrier(); // Barrier syncronization
+    snrt_cluster_hw_barrier();
+    snrt_mcycle();
 
     uint32_t err = 0;
 

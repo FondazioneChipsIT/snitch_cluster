@@ -5,8 +5,6 @@ void fir_opt(uint32_t chunk_per_core, uint32_t offset,
 
     float zero = 0.0f;
 
-    snrt_mcycle();
-
     asm volatile(
         "flw ft3, 0(%[zero])\n"
         "flw ft4, 0(%[zero])\n"
@@ -45,8 +43,6 @@ void fir_opt(uint32_t chunk_per_core, uint32_t offset,
         snrt_fpu_fence();
 
     }
-    
-    snrt_mcycle();
 
     return;
 }

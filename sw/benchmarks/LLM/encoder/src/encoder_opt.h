@@ -3,7 +3,7 @@
 void encoder_opt( uint32_t chunk_per_core, uint32_t offset,
     int *inp, float *wte_TCDM, float *wpe_TCDM, float *out_TCDM){
 
-    snrt_mcycle();
+    
 
     for (uint32_t i = offset; i < offset + chunk_per_core; i++) {
         // We dont need B as we have split the work among the cores
@@ -32,7 +32,7 @@ void encoder_opt( uint32_t chunk_per_core, uint32_t offset,
 
     }
 
-    snrt_mcycle();
+    
 
     return;
 }

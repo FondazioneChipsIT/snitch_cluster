@@ -6,8 +6,6 @@ void matrix_mul_opt(uint32_t chunk_per_core, uint32_t offset,
                     uint32_t m, uint32_t n, uint32_t k){
 
     float zero = 0.0; // Zero register
-
-    snrt_mcycle();
     
     // Read the mat_a matrix with a 1 stride-> access a row
     snrt_ssr_loop_1d(SNRT_SSR_DM0, m*k, sizeof(float));
@@ -68,7 +66,5 @@ void matrix_mul_opt(uint32_t chunk_per_core, uint32_t offset,
     snrt_ssr_disable();
     snrt_fpu_fence();
     
-    snrt_mcycle();
-
     return;
 }

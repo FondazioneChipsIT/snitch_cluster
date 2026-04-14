@@ -95,7 +95,7 @@ static inline void flashattention_2_fp32(
             float *K_fa = &K_TCDM[t_c * fa_Bc * fa_d];
             float *V_fa = &V_TCDM[t_c * fa_Bc * fa_d];
 
-            snrt_mcycle();
+            
 
             // S = Q * K^T   (fa_Br x fa_Bc)
             gemm_args.n   = fa_Bc;
@@ -191,8 +191,6 @@ static inline void flashattention_2_fp32(
         }
         snrt_fpu_fence();
         snrt_partial_barrier(&barr2, 8);
-
-        snrt_mcycle();
 
     }  // end T_r
 }

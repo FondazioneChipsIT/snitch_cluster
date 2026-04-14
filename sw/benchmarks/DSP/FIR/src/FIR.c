@@ -51,6 +51,7 @@ int main(){
     }
 
     snrt_cluster_hw_barrier(); // Barrier syncronization
+    snrt_mcycle();
 
     // Only the compute cores do something
     if(snrt_is_compute_core()){
@@ -68,6 +69,9 @@ int main(){
             fir_naive(chunk_per_core, offset, x, y, h);
 
     }
+    
+    snrt_cluster_hw_barrier(); // Barrier syncronization
+    snrt_mcycle();
 
     return 0;
 }

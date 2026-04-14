@@ -12,11 +12,11 @@
         atomic_id_width: 5, // clog2(total number of clusters)
         user_width: 53, // addr_width + atomic_id_width
         tcdm: {
-            size: 1024,
-            banks: 256,
+            size: 32768, // 32 MB
+            banks: 8192, // 4 KB per bank
         },
         cluster_periph_size: 508, // kB
-        zero_mem_size: 512, // kB
+        zero_mem_size: 32256, // kB
         // Sum of the sizes of all the address regions should be a power of 2,
         // and we have an added 4KB for the boot ROM, so we can have at most 508kB of address regions.
         alias_region_enable: true,

@@ -35,10 +35,11 @@ int main() {
         snrt_dma_wait_all();
     }
 
-	snrt_cluster_hw_barrier();
-	
 	float *y;
-    
+
+	snrt_cluster_hw_barrier();
+	snrt_mcycle(); // Start cycle count
+	
 	if(snrt_is_compute_core()){
 
 		if(use_opt)
@@ -49,6 +50,7 @@ int main() {
 	}
 
 	snrt_cluster_hw_barrier();
+	snrt_mcycle();
 
 	// Check against golden model
 	if (core_id == 0) {
