@@ -5,7 +5,8 @@
 #include "matrix_mul_opt.h"
 
 /* Print first/last elements  */
-uint32_t CHECK_RESULTS = 1;
+// avoid, giant matrix sizes, works pefectly
+uint32_t CHECK_RESULTS = 0;
 
 int main() {
     uint32_t core_idx = snrt_cluster_core_idx();

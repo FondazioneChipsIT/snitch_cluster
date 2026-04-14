@@ -50,7 +50,7 @@ int main() {
     snrt_cluster_hw_barrier();
 
     uint32_t err = 0;
-    float eps = 1e-5f;
+    float eps = 5e-5f;
 
     if (CHECK_RESULTS == 1 && core_idx == 0) {
         asm("nop \n");

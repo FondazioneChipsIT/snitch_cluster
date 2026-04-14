@@ -46,7 +46,7 @@ int main() {
 
     uint32_t err = 0;
     float eps = 1e-4f;
-s
+
     if (core_idx == 0) {
         asm("nop \n");
         for(uint32_t i = 0; i < N; i++){

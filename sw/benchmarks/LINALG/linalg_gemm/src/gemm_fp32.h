@@ -18,7 +18,7 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
 
     // we cannot write C with ssrs as we need to read it, SSRs are unidirectional
 
-    /* Load zero into ft3, used as accumulator */
+    /* Load zero into the accumulators */
     asm volatile(
     "flw ft3, 0(%[zero])\n"
     "flw ft4, 0(%[zero])\n"
@@ -35,29 +35,34 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
     for(uint32_t cols = 0; cols < chunk_per_core; cols++){
         // All rows of mat_a, all for each column of mat b
         // Read all rows of mat_a, one at a time, with stride 1, so we get a row of mat_a in each iteration
-        snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, mat_a);
+        snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, mat_a + 0);
         
         for(uint32_t rows = 0; rows < m; rows++){
             // As for the column the read is easy as it is only offset+rows (stored as rows)
             snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, mat_b + cols + offset);
 
-            // Explicit read of c_val, already multiplied by beta
-            float beta_c_val = beta * mat_c[cols + offset + rows*(size_t)n];
+            float *ptr = mat_c + cols + offset + rows*n; // Pointer to the output element
+            // Explicit assembly to avoid letting the compiler
+            // use ft0 (will result in a deadlock as the 
+            // SSRs are read before the computation)
+            // ft8 = beta* C_val
             asm volatile(
-            "flw ft8, 0(%[beta_c_val])\n"
-            :: [beta_c_val] "r"(&beta_c_val)
+            "flw ft8, 0(%[beta])\n"
+            "flw ft9, 0(%[ptr])\n"
+            "fmul.s ft8, ft8, ft9\n"
+            ::[beta] "r"(&beta), [ptr] "r"(ptr)
             : "ft8", "memory");
 
             asm volatile(
-                "frep.o %[n_frep], 4, 0, 0 \n"  /* Repeat elems times: ft3 = ft0 (mat_a) * ft1 (mat_b) + ft3 (acc)*/
+                "frep.o %[n_frep], 4, 0, 0 \n"  /* Repeat k/4 times: ft3 = ft0 (mat_a) * ft1 (mat_b) + ft3 (acc)*/
                 "fmadd.s ft3, ft0, ft1, ft3\n"
                 "fmadd.s ft4, ft0, ft1, ft4\n"
                 "fmadd.s ft5, ft0, ft1, ft5\n"
                 "fmadd.s ft6, ft0, ft1, ft6\n"
 
-                "fadd.s ft3, ft3, ft4\n" /* Store back result in dst ft2 (dst) = ft3 (result) + ft4 (0) */
+                "fadd.s ft3, ft4, ft3\n" /* Reduce the 4 accumulators into one */
                 "fadd.s ft5, ft5, ft3\n" 
-                "fadd.s ft9, ft5, ft6\n" 
+                "fadd.s ft9, ft6, ft5\n" 
 
                 "fmul.s ft9, ft9, ft7\n" /* Multiply by alpha, ft2 = alpha *A*B */
                 "fadd.s ft9, ft9, ft8\n" /* Add beta * c_val, ft2 = alpha *A*B + beta * C_val */
@@ -69,11 +74,10 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
                 "fsub.s ft5, ft5, ft5\n"
                 "fsub.s ft6, ft6, ft6\n"
                 : 
-                : [n_frep] "r"(k/4 - 1),  [dst] "+r"(mat_c + cols + offset + rows*(size_t)n)
-                : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "ft8", "memory");
+                : [n_frep] "r"(k/4 - 1), [dst] "r"(ptr)
+                : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "ft8", "ft9", "memory");
 
-                snrt_fpu_fence(); /* Ensure all stores are visible before next iteration */
-               
+            snrt_fpu_fence();
         }    
 
     }

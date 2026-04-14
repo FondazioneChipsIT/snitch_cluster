@@ -78,7 +78,7 @@ module snitch_cluster_wrapper (
     .ExtMemorySize (snitch_cluster_pkg::ExtMemorySize),
     .BootRomSize (snitch_cluster_pkg::BootromSize),
     .ClusterPeriphSize (snitch_cluster_pkg::ClusterPeriphSize),
-    .NrBanks (32),
+    .NrBanks (256),
     .NrHyperBanks (1),
     .DMANumAxInFlight (24),
     .DMAReqFifoDepth (8),

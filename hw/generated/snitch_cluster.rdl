@@ -17,7 +17,7 @@ addrmap snitch_cluster {
     default regwidth = 32;
 
     mem tcdm {
-        mementries = 0x8000;
+        mementries = 0x40000;
         memwidth = 32;
     };
 
@@ -27,15 +27,15 @@ addrmap snitch_cluster {
     };
 
     mem zeromem {
-        mementries = 0x4000;
+        mementries = 0x20000;
         memwidth = 32;
     };
 
 
     external tcdm                 tcdm           ;
-    external bootrom              bootrom        @0x20000;
-    snitch_cluster_peripheral_reg peripheral_reg @0x21000;
-    external zeromem              zeromem        @0x30000;
+    external bootrom              bootrom        @0x100000;
+    snitch_cluster_peripheral_reg peripheral_reg @0x101000;
+    external zeromem              zeromem        @0x180000;
 
 
 };

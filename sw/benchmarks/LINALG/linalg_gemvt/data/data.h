@@ -11,6 +11,7 @@
 #endif
 
 float *mat_a_TCDM;
+float *mat_a_trans_TCDM;
 float *vec_x_TCDM;
 float *dst_TCDM;
 
