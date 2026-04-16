@@ -2,24 +2,22 @@
 #include "snrt.h"
 
 snrt_barrier_t barr;
+uint32_t MAX_ITER = 1000;
+float EPSILON = 1e-12f;
 
-uint32_t svd_jacobi_opt(float *mat, float *mat_V, float *vec_S, const uint32_t dim_M){
+void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S, const uint32_t dim_M){
     
-    uint32_t pairs_per_round;
-    uint32_t even_dim;
+
     uint32_t iter;
-    uint32_t id;
     float max_offdiag;
 
-    id = snrt_cluster_core_idx();
+    uint32_t id = snrt_cluster_core_idx();
     uint32_t NUM_CORES = snrt_cluster_compute_core_num();
-    even_dim = (dim_M % 2 == 0) ? dim_M : (dim_M + 1);
-    pairs_per_round = even_dim / 2;
+    uint32_t pairs_per_round = dim_M / 2;
 
-    iter = 0;
-    while (iter++ < MAX_ITER) {
+    for (iter = 0; iter < MAX_ITER; iter++) {
 
-        for (uint32_t round = 0; round < (even_dim - 1); round++) {
+        for (uint32_t round = 0; round < (dim_M - 1); round++) {
             uint32_t pair_start;
             uint32_t pair_end;
             uint32_t block;
@@ -30,10 +28,11 @@ uint32_t svd_jacobi_opt(float *mat, float *mat_V, float *vec_S, const uint32_t d
             pair_start = id * block + (id < left ? id : left);
             pair_end = pair_start + block + (id < left ? 1 : 0);
 
-            local_max[id] = 0;
+            float *ptr = local_max + id;
+            *ptr = 0.0f;
 
             if (pair_start >= pair_end) {
-                return 1;
+                return;
             }
 
             for (uint32_t pair = pair_start; pair < pair_end; pair++) {
@@ -47,8 +46,8 @@ uint32_t svd_jacobi_opt(float *mat, float *mat_V, float *vec_S, const uint32_t d
 
                 snrt_partial_barrier(&barr, 8);
 
-                i = (round + pair) % (even_dim - 1);
-                j = (pair == 0) ? (even_dim - 1) : ((even_dim - 1 - pair + round) % (even_dim - 1));
+                i = (round + pair) % (dim_M - 1);
+                j = (pair == 0) ? (dim_M - 1) : ((dim_M - 1 - pair + round) % (dim_M - 1));
 
                 compute = true;
                 if (i >= dim_M || j >= dim_M)
@@ -58,13 +57,13 @@ uint32_t svd_jacobi_opt(float *mat, float *mat_V, float *vec_S, const uint32_t d
                     compute = false;
 
                 if (compute) {
-                    tau = (mat[j * dim_M + j] - mat[i * dim_M + i]) / (TWO_f * mat[i * dim_M + j]);
-                    if (tau >= ZERO_f)
-                        t = ONE_f / (tau + sqrtf(ONE_f + tau * tau));
+                    tau = (mat[j * dim_M + j] - mat[i * dim_M + i]) / (2.0f * mat[i * dim_M + j]);
+                    if (tau >= 0.0f)
+                        t = 1.0f / (tau + sqrtf(1.0f + tau * tau));
                     else
-                        t = ONE_f / (tau - sqrtf(ONE_f + tau * tau));
+                        t = 1.0f / (tau - sqrtf(1.0f + tau * tau));
 
-                    cos = ONE_f / sqrtf(ONE_f + t * t);
+                    cos = 1.0f / sqrtf(1.0f + t * t);
                     sin = t * cos;
 
                     /* Update rows i and j of MAT */
@@ -108,8 +107,8 @@ uint32_t svd_jacobi_opt(float *mat, float *mat_V, float *vec_S, const uint32_t d
                     }
 
 
-                    if (fabs(mat[i * dim_M + j]) > local_max[id])
-                        local_max[id] = fabs(mat[i * dim_M + j]);
+                    if (fabs(mat[i * dim_M + j]) > ptr[id])
+                        ptr[id] = fabs(mat[i * dim_M + j]);
                 }
 
             } /* End of pairs for this round */
@@ -118,10 +117,10 @@ uint32_t svd_jacobi_opt(float *mat, float *mat_V, float *vec_S, const uint32_t d
 
             /* Reduction */
             if (id == 0) {
-                max_offdiag = local_max[0];
+                max_offdiag = ptr[0];
                 for (uint32_t cid = 1; cid < NUM_CORES; cid++)
-                    if (local_max[cid] > max_offdiag)
-                        max_offdiag = local_max[cid];
+                    if (ptr[cid] > max_offdiag)
+                        max_offdiag = ptr[cid];
             }
 
             snrt_partial_barrier(&barr, 8);
@@ -138,9 +137,6 @@ uint32_t svd_jacobi_opt(float *mat, float *mat_V, float *vec_S, const uint32_t d
 
     }   /* Iters */
 
-    if (iter >= MAX_ITER) {
-        return -1;
-    }
 
     uint32_t block;
     uint32_t start;
@@ -161,5 +157,5 @@ uint32_t svd_jacobi_opt(float *mat, float *mat_V, float *vec_S, const uint32_t d
 
     snrt_partial_barrier(&barr, 8);
 
-    return 0;
+    return;
 }

@@ -19,7 +19,7 @@ float *mat_U;    /* M×K left  singular vectors  */
 float *mat_V;    /* N×K right singular vectors  */
 float *vec_S;    /* K   singular values         */
 
-float *local_max[8];
+float *local_max;
 
 /* Input: random M×N matrix (row-major) */
 float mat_data[64 * 32] = {

@@ -25,11 +25,6 @@ int main() {
         result = vec + elems;
         local_sum = result + elems;
 
-        if (!mat || !perm_vec || !y || !result || !local_sum) {
-            printf("Memory allocation failed!\n");
-            return -1;
-        }
-
         for (uint32_t i=0; i<elems; i++) {
             for (uint32_t j=0; j<elems; j++) {
                 mat[i*elems + j] = mat_LU[i*elems + j]; // Copy the generated LU matrix by the 

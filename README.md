@@ -1,11 +1,6 @@
 ![CI](https://github.com/pulp-platform/snitch_cluster/actions/workflows/ci.yml/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-# WARNING!
-The hardware is currently setup to have more than the base 128KiB of L1 cache to perform some benchmarks and tests. When you setup the cluster, please use the cfg file FP32_xdiv.json.
-This will not be a problem in simulation, it just allows to simulate larger datasets.
-But if you have to perform any kind of physical flow, please revert the changes.
-
 # How to setup the hardware for FP32
 Create a new cfg file in the /cfg folder. Change the DataWidth to 32 bits, remove the "d" extension from the compute cores and the dma core.
 

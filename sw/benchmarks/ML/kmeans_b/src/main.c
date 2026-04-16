@@ -1,77 +1,74 @@
-// Copyright 2024 ETH Zurich and University of Bologna.
-// Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Author: Luca Colagrande <colluca@iis.ee.ethz.ch>
-
 #include <stdint.h>
-
 #include "data.h"
 #include "kmeans_new.h"
 
-int main (){
+uint32_t CHECK_RESULTS = 1; // Set to 0 to skip verification (for performance measurement)
 
-    float* samples_addr = (float*)(samples);
-    float* centroids_addr = (float*)(centroids);
+int main() {
+    uint32_t core_idx = snrt_cluster_core_idx();
+    uint32_t n_cores  = snrt_cluster_compute_core_num();
 
-    // Distribute work
-    uint32_t n_samples_per_cluster = n_samples / snrt_cluster_num();
+    // Distribuzione campioni con remainder corretto
+    uint32_t chunk     = n_samples / n_cores;
+    uint32_t remainder = n_samples % n_cores;
+    uint32_t start_idx = core_idx * chunk + (core_idx < remainder ? core_idx : remainder);
+    uint32_t end_idx   = start_idx + chunk + (core_idx < remainder ? 1 : 0);
 
-    uint32_t remaining_samples = n_samples % snrt_cluster_num();
+    // ── Layout TCDM (un'unica allocazione contigua) ───────────────────────────
+    //  local_samples       [n_samples * n_features]           float
+    //  local_centroids     [n_clusters * n_features]          float  ← aggiornato in-place
+    //  partial_centroids   [n_cores * n_clusters * n_features] float
+    //  membership          [n_samples]                        uint32_t
+    //  partial_cnt         [n_cores * n_clusters]             uint32_t
 
-    // Split the remaining samples among the first few clusters
-    uint32_t n_samples_per_core = snrt_cluster_idx() < remaining_samples ? n_samples_per_cluster/ snrt_cluster_compute_core_num() + 1 : n_samples_per_cluster/ snrt_cluster_compute_core_num();
+    float*    local_samples   = (float*)snrt_l1_next();
+    float*    local_centroids = local_samples   + n_samples  * n_features;
+    float*    partial_cents   = local_centroids + n_clusters * n_features;
+    uint32_t* membership      = (uint32_t*)(partial_cents + n_cores * n_clusters * n_features);
+    uint32_t* partial_cnt     = membership + n_samples;
 
-    // Dynamically allocate space in TCDM
-    float* local_samples = (float*)snrt_l1_alloc_cluster_local(
-        n_samples_per_cluster * n_features * sizeof(float), sizeof(float));
-    float* local_centroids = (float*)snrt_l1_alloc_cluster_local(
-        n_clusters * n_features * sizeof(float), sizeof(float));
-    uint32_t* membership = (uint32_t*)snrt_l1_alloc_cluster_local(
-        n_samples_per_cluster * sizeof(uint32_t), sizeof(uint32_t));
-    // Allocate in the cores
-    uint32_t* partial_membership_cnt = (uint32_t*)snrt_l1_next(); 
-    // First core's partial centroids will store final centroids
-    float* partial_centroids = (float*)(partial_membership_cnt + n_clusters * sizeof(uint32_t));
-    float* final_centroids = partial_centroids + n_clusters * n_features;
-    final_centroids =
-        (float*)snrt_remote_l1_ptr(final_centroids, snrt_cluster_idx(), 0);
-
-    // Transfer samples and initial centroids with DMA
-    size_t size;
-    size_t offset;
+    // ── DMA: carica campioni e centroidi iniziali ─────────────────────────────
     if (snrt_is_dm_core()) {
-        size = n_samples_per_cluster * n_features;
-        offset = snrt_cluster_idx() * size;
-        snrt_dma_start_1d(local_samples, samples_addr + offset,
-                          size * sizeof(float));
-        size = n_clusters * n_features * sizeof(float);
-        snrt_dma_start_1d(local_centroids, centroids_addr, size * sizeof(float));
+        snrt_dma_start_1d(local_samples,   (float*)samples,
+                          n_samples  * n_features * sizeof(float));
+        snrt_dma_start_1d(local_centroids, (float*)centroids,
+                          n_clusters * n_features * sizeof(float)); // ← era *sizeof(float) due volte
         snrt_dma_wait_all();
     }
-
     snrt_cluster_hw_barrier();
     snrt_mcycle();
 
-    if(snrt_is_compute_core()) {
-        // Iterations of Lloyd's K-means algorithm
-        for (uint32_t iter_idx = 0; iter_idx < n_iter; iter_idx++) {
-            kmeans_iteration(n_samples_per_core, n_clusters, n_features,
-                            local_samples, membership, partial_membership_cnt,
-                            local_centroids, partial_centroids);
-            snrt_global_barrier();
-            local_centroids = final_centroids;
+    if (snrt_is_compute_core()) {
+        // Ogni core punta alla propria fetta degli array parziali
+        float*    my_partial = partial_cents + core_idx * n_clusters * n_features;
+        uint32_t* my_cnt     = partial_cnt   + core_idx * n_clusters;
+
+        for (uint32_t iter = 0; iter < n_iter; iter++) {
+            kmeans_iteration(
+                start_idx, end_idx,
+                n_clusters, n_features,
+                local_samples, membership,
+                my_cnt,     local_centroids,
+                my_partial, partial_cnt, partial_cents
+            );
+            // local_centroids viene aggiornato in-place da core 0 dentro kmeans_iteration
         }
     }
 
     snrt_cluster_hw_barrier();
     snrt_mcycle();
 
-    // Transfer final centroids with DMA
-    /*if (snrt_is_dm_core()) {
-        snrt_dma_start_1d((void*)centroids, (void*)final_centroids, size);
-        snrt_dma_wait_all();
-    }*/
+    uint32_t err = 0;
+    float eps = 0.1f;
 
-    return 0;
+    if (CHECK_RESULTS == 1 && core_idx == 0) {
+        for(uint32_t i = 0; i < n_clusters * n_features; i++){
+            if(fabsf(local_centroids[i] - golden_centroids[i]) > eps){ // Using a tolerance of 0.1 for classification output
+                err ++;
+            }
+        }
+    }
+
+    return err;
 }

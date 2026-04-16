@@ -6,8 +6,7 @@
 #include "svd_jacobi_opt.h"
 
 uint32_t CHECK_RESULTS = 1;
-uint32_t MAX_ITER = 1000;
-float EPSILON = 1e-12f;
+
 
 int main() {
     uint32_t core_idx = snrt_cluster_core_idx();
@@ -33,14 +32,22 @@ int main() {
     snrt_cluster_hw_barrier();
     snrt_mcycle();
     // kernel call
-    uint_32t err = 0;
-
     if(snrt_is_compute_core()){
-        err = svd_jacobi_opt(mat, mat_V, vec_S, M);
+        svd_jacobi_opt(mat, mat_V, vec_S, M);
     }
-
     snrt_cluster_hw_barrier();
     snrt_mcycle();
+
+    uint32_t err = 0;
+    float eps = 1e-4f;
+
+    if (core_idx == 0 && CHECK_RESULTS) {
+        for(uint32_t i = 0; i < M*N; i++){
+            if(fabsf(mat_V[i] - golden_V[i]) > eps || fabsf(mat[i] - golden_U[i]) > eps || fabsf(vec_S[i] - golden_S[i]) > eps){
+                err ++;
+            }
+        }
+    }
 
     return err;
 }

@@ -66,6 +66,8 @@ void lu_solve_naive(float *mat, uint32_t *perm, float *y, float *vec, float *res
         uint32_t start = (m + 1) + start_rel;
         uint32_t end   = (m + 1) + end_rel;
 
+        snrt_partial_barrier(&barr, 8);
+
         for (uint32_t k = start; k < end; k++)
             local_sum[core_idx] += mat[m * elems + k] * result[k];
         
@@ -80,7 +82,6 @@ void lu_solve_naive(float *mat, uint32_t *perm, float *y, float *vec, float *res
             result[m] = (y[m] - sum) / mat[m * elems + m];
         }
      
-        snrt_partial_barrier(&barr, 8);
     }
 
     return;

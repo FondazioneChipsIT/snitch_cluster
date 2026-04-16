@@ -4,11 +4,11 @@ from sklearn.datasets import make_blobs
 from sklearn.cluster import KMeans
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-n_samples  = 64    # must be multiple of 8
-n_features = 2
-n_clusters = 2
-seed       = 42
-max_iter   = 100
+n_samples  = 100  
+n_features = 8
+n_clusters = 8
+seed       = 1
+max_iter   = 10
 
 # ── Generate samples ──────────────────────────────────────────────────────────
 X, _ = make_blobs(
@@ -17,7 +17,7 @@ X, _ = make_blobs(
     centers=n_clusters,
     random_state=seed
 )
-X = X.astype(np.float64)
+X = X.astype(np.float32)  # Convert to float32 for C compatibility
 
 # ── Initial centroids ─────────────────────────────────────────────────────────
 rng = np.random.default_rng(seed=seed)

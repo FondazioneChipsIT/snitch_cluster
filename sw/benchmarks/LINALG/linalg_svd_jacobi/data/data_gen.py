@@ -76,7 +76,7 @@ with open(file_path, "w") as f:
     f.write("float *mat_U;    /* M×K left  singular vectors  */\n")
     f.write("float *mat_V;    /* N×K right singular vectors  */\n")
     f.write("float *vec_S;    /* K   singular values         */\n\n")
-    f.write("float *local_max[8];\n\n")
+    f.write("float local_max[8];\n\n")
 
     # Input matrix
     f.write("/* Input: random M×N matrix (row-major) */\n")

@@ -41,13 +41,11 @@ float rbf(float *x, float *y, float gamma, int f_dim){
 
     snrt_ssr_enable();
     asm volatile(
-        "frep.o %[n_frep], 6, 0, 0 \n"  
+        "frep.o %[n_frep], 4, 0, 0 \n"  
         "fsub.s ft3, ft0, ft1\n" // Unroll by 2, first subtract the elements
         "fsub.s ft4, ft0, ft1\n"
-        "fmul.s ft3, ft3, ft3\n" // Then square the differences
-        "fmul.s ft4, ft4, ft4\n"
-        "fadd.s ft5, ft5, ft3\n" // accumulate the sum of the squared difference
-        "fadd.s ft6, ft6, ft4\n"
+        "fmadd.s ft5, ft3, ft3, ft5\n" // Then square the differences and accumulate the sum of the squared difference
+        "fmadd.s ft6, ft4, ft4, ft6\n"
         // Sum of the squared differences and multiply by gamma
         "fadd.s ft6, ft5, ft6\n" // Sum the two accumulators
         "fmul.s ft6, ft6, ft7\n" // Multiply by gamma
