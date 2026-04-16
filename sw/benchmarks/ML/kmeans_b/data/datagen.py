@@ -46,7 +46,7 @@ def vec_to_c(name, arr, aligned=True):
 
 # ── Write data.h ──────────────────────────────────────────────────────────────
 script_dir = os.path.dirname(os.path.abspath(__file__))
-file_path  = os.path.join(script_dir, "data.h")
+file_path  = os.path.join(script_dir, "../build/data.h")
 
 with open(file_path, "w") as f:    
     f.write(f"uint32_t n_samples = {n_samples};\n\n")

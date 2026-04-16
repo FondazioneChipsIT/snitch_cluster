@@ -2,9 +2,13 @@
 #define DATA_H
 
 // Matrix elems (for now only a multiple of ncores, default 8)
-#ifndef elems
-#define elems 64
+#ifndef rows
+#define rows 64
 #endif
+#ifndef cols
+#define cols 32
+#endif
+
 
 // TCDM pointers to our data
 float *mat, *orig_buf, *row_k, *row_b;

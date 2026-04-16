@@ -29,7 +29,7 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
     uint32_t chunk_real;
 
     // Used for vec_write_back offset
-    uint32_t vec_offset = core_idx * elems;
+    uint32_t vec_offset = core_idx * cols;
 
     // Zero pivot threshold
     float eps = 1e-15f;
@@ -44,20 +44,20 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
     : "ft5");
 
 
-    for (uint32_t k = 0; k < elems; k++) {
+    for (uint32_t k = 0; k < cols; k++) {
 
         // Only core 0 does pivot selection and row swap, not possible to parallelize
         if(core_idx == 0){
 
             /* pivot selection on current column */
             row_max = k;
-            max_val = fabsf(mat[k * elems + k]);
+            max_val = fabsf(mat[k * cols + k]);
             
             // Could be optimized with SSRs? 
             // but overhead probably too high for single column
             // and difficult to implement efficiently
-            for (uint32_t m = k + 1; m < elems; m++) {
-                float cur = fabsf(mat[m * elems + k]);
+            for (uint32_t m = k + 1; m < rows; m++) {
+                float cur = fabsf(mat[m * cols + k]);
                 if (cur > max_val) { 
                     // This line cannot be optimized with SSRs
                     row_max = m; 
@@ -76,10 +76,10 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
             if (row_max != k) {
 
                 // Optimized row swap with SSR and FREP
-                matrix_swap_rows_opt2(elems, 0, mat, row_k, row_b, k, row_max);
+                matrix_swap_rows_opt2(rows, 0, mat, row_k, row_b, k, row_max);
 
-                // Or simple version if needed, elems<32
-                // swap_rows_simple(mat, elems, k, row_max);
+                // Or simple version if needed, rows<32
+                // swap_rows_simple(mat, rows, k, row_max);
 
                 // This update cannot be optimized with SSRs, as the overhead at the start
                 // and the need to change between read and write mode would be too high.
@@ -96,21 +96,21 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
         snrt_partial_barrier(&barr, 8);
 
         // Each core has its own copy of the pivot row
-        float pivot = mat[k * elems + k];
+        float pivot = mat[k * cols + k];
         float p_inv = 1.0f / pivot;
 
     
     
         // for columns after k, distribute rows among cores
-        left = (elems - (k + 1)) % ncores;
-        base = (elems - (k + 1)) / ncores;
+        left = (cols - (k + 1)) % ncores;
+        base = (cols - (k + 1)) / ncores;
         chunk_per_core = base + (core_idx < left ? 1 : 0);
         offset = (k + 1) + core_idx * base + (core_idx < left ? core_idx : left);
         end = offset + chunk_per_core;
 
         // for rows, we must add an offset of (k+1)
-        // so total rows to consider is elems-(k+1)
-        uint32_t row_chunk = elems - (k + 1);
+        // so total rows to consider is rows-(k+1)
+        uint32_t row_chunk = rows - (k + 1);
         uint32_t row_offset = k + 1;
 
         for (int m = offset; m < end; m++) {
@@ -118,8 +118,8 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
             float factor;
 
             // Same as before, cannot be optimized with SSRs
-            factor = mat[m * elems + k] * p_inv;
-            mat[m * elems + k] = factor;
+            factor = mat[m * cols + k] * p_inv;
+            mat[m * cols + k] = factor;
 
                 /* Load factor into ft3 */
             asm volatile(
@@ -134,9 +134,9 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
             snrt_ssr_loop_1d(SNRT_SSR_DM2, row_chunk, sizeof(float));
 
             // read the matrix, use a buffer to store results
-            snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, mat + k * elems + row_offset); // pivot row
-            snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, mat + m * elems + row_offset); // current row
-            snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, mat + m * elems + row_offset); // write back
+            snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, mat + k * cols + row_offset); // pivot row
+            snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, mat + m * cols + row_offset); // current row
+            snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, mat + m * cols + row_offset); // write back
             
             snrt_ssr_enable();
 

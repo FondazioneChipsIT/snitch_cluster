@@ -74,8 +74,6 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
                 : 
                 : [n_frep] "r"(k/4 - 1), [dst] "r"(ptr)
                 : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "ft8", "ft9", "memory");
-
-            snrt_fpu_fence();
         }    
 
     }

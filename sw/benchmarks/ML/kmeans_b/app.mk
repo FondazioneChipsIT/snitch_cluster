@@ -5,9 +5,9 @@
 # Luca Colagrande <colluca@iis.ee.ethz.ch>
 
 APP                 := kmeans_b
-$(APP)_BUILD_DIR    ?= $(SN_ROOT)/sw/benchmarks/DSP/$(APP)/build
-SRC_DIR             := $(SN_ROOT)/sw/benchmarks/DSP/$(APP)/src
+$(APP)_BUILD_DIR    ?= $(SN_ROOT)/sw/benchmarks/ML/$(APP)/build
+SRC_DIR             := $(SN_ROOT)/sw/benchmarks/ML/$(APP)/src
 SRCS                := $(SRC_DIR)/main.c
-$(APP)_INCDIRS   	:= $(SN_ROOT)/sw/benchmarks/DSP/$(APP)/build
+$(APP)_INCDIRS   	:= $(SN_ROOT)/sw/benchmarks/ML/$(APP)/build
 
 include $(SN_ROOT)/sw/kernels/common.mk

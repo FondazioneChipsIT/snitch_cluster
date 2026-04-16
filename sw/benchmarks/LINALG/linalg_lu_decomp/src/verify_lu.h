@@ -14,8 +14,8 @@ static float snitch_sqrt(float x) {
 }
 
 void verify_lu(float *Aorig, float *mat, int *perm, uint32_t n) {
-    float PA[elems*elems];
-    float LU[elems*elems];
+    float PA[rows*cols];
+    float LU[cols*cols];
     /* Build PA */
     for (uint32_t i=0;i<n;i++){
         int orig = perm[i];
