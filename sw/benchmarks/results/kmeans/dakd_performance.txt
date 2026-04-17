@@ -1,0 +1,18 @@
+Kernel: kmeans
+Elements: dakd
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     52033      0.813    0.1279          0.2564         
+1     52033      0.467    0.1279          0.2159         
+2     52033      0.467    0.1279          0.2159         
+3     52033      0.467    0.1279          0.2159         
+4     52033      0.440    0.1181          0.1993         
+5     52033      0.439    0.1181          0.1993         
+6     52033      0.440    0.1181          0.1993         
+7     52033      0.440    0.1181          0.1993         
+
+Cluster average:
+Cycles mean             : 52033.00
+Total cycles            : 416264.00
+IPC                     : 0.497
+FPU Utilization         : 0.160

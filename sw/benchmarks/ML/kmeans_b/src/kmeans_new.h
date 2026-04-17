@@ -3,12 +3,11 @@
 
 float euclidean_distance_squared(uint32_t n_features, float* p1, float* p2) {
     float sum = 0.0f;
-    for (uint32_t i = 0; i < n_features; i++) {
-        float diff = p1[i] - p2[i];
-        sum += diff * diff;
-    }
+    //for (uint32_t i = 0; i < n_features; i++) {
+    //    float diff = p1[i] - p2[i];
+    //    sum += diff * diff;
+    //}
     
-    /*
     float zero = 0.0f;
     asm volatile(
     "flw ft5, 0(%[zero])\n" // accumulator1
@@ -34,7 +33,7 @@ float euclidean_distance_squared(uint32_t n_features, float* p1, float* p2) {
         : 
         : [n_frep] "r"(n_features/2 - 1), [sum] "r"(&sum)
         : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "memory");
-    snrt_ssr_disable();*/
+    snrt_ssr_disable();
     return sum;
 }
 

@@ -1,0 +1,18 @@
+Kernel: RANDOMFOREST
+Elements: 6trees,280-300nodes
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     23594      0.126    0.0000          0.0000         
+1     23594      0.572    0.0000          0.0000         
+2     23594      0.550    0.0000          0.0000         
+3     23594      0.615    0.0000          0.0000         
+4     23594      0.585    0.0000          0.0000         
+5     23594      0.509    0.0000          0.0000         
+6     23594      0.115    0.0000          0.0000         
+7     23594      0.114    0.0000          0.0000         
+
+Cluster average:
+Cycles mean             : 23594.00
+Total cycles            : 188752.00
+IPC                     : 0.398
+FPU Utilization         : 0.000

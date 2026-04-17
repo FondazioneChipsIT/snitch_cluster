@@ -101,6 +101,7 @@ SN_APPS += $(SN_ROOT)/sw/benchmarks/ML/CONV3x3
 SN_APPS += $(SN_ROOT)/sw/benchmarks/ML/kmeans_b
 SN_APPS += $(SN_ROOT)/sw/benchmarks/ML/SVM_BILL
 SN_APPS += $(SN_ROOT)/sw/benchmarks/ML/SVM_CANC
+SN_APPS += $(SN_ROOT)/sw/benchmarks/ML/RANDOM_FOREST
 
 endif
 
