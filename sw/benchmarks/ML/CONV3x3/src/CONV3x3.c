@@ -7,8 +7,6 @@
 #include "conv3x3_opt.h"
 #include "conv3x3_naive.h"
 
-bool use_opt = 1;
-
 uint32_t CHECK_RESULTS = 1; // Set to 1 to check results against golden output
 
 int main(){
@@ -31,24 +29,19 @@ int main(){
 
     }
 
+    // Compute the chunk of the matrix, represents
+    // the number of rows each core has to use
+    uint32_t chunk_per_core = FM_ROWS/ncores;
+    // Offset to index the correct chunk of data per core
+    uint32_t offset = core_idx*chunk_per_core;
+        
     snrt_cluster_hw_barrier();
     snrt_mcycle();
 
     // Only the compute cores do something
     if(snrt_is_compute_core()){
-
-        // Compute the chunk of the matrix, represents
-        // the number of rows each core has to use
-        uint32_t chunk_per_core = FM_ROWS/ncores;
-        // Offset to index the correct chunk of data per core
-        uint32_t offset = core_idx*chunk_per_core;
-        
-        // Call the kernel
-        if(use_opt)
-            conv3x3_opt(core_idx,chunk_per_core, offset, input_TCDM, dst_TCDM, kernel_TCDM);
-        else 
-            conv3x3_naive(core_idx,chunk_per_core, offset, input_TCDM, dst_TCDM, kernel_TCDM);
-
+        // Call the kernel   
+        conv3x3_opt(core_idx,chunk_per_core, offset, input_TCDM, dst_TCDM, kernel_TCDM);
     }
 
     snrt_cluster_hw_barrier();

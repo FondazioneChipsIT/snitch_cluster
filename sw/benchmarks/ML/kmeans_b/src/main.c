@@ -1,6 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
-#include <stdint.h>
-#include <math.h>
+#include "snrt.h"
 #include "data.h"
 #include "kmeans_new.h"
 
@@ -45,6 +43,7 @@ int main() {
                 my_cnt,        local_centroids,
                 my_partial,    partial_cnt, partial_cents
             );
+            snrt_partial_barrier(&barr, 8);
         }
     }
 
@@ -52,19 +51,15 @@ int main() {
     snrt_mcycle();
 
     uint32_t err = 0;
-    float    eps = 1.0f; // float32 vs float64 accumula differenze su N iterazioni
+    float    eps = 0.1f; 
 
     if (CHECK_RESULTS == 1 && core_idx == 0) {
-        // ── Matching nearest-centroid ─────────────────────────────────────────
-        // Per ogni centroide calcolato, trova il golden più vicino (L2).
-        // Robusto alla label permutation indipendentemente dall'ordinamento.
-        uint32_t used[8] = {0}; // n_clusters <= 8, VLA non serve
-
+        uint32_t used[8] = {0}; 
+        printf("Golden check!\n");
         for (uint32_t k = 0; k < n_clusters; k++) {
             float    best_dist = __builtin_inff();
             uint32_t best_g    = 0;
 
-            // Trova il golden non ancora usato più vicino al centroide k
             for (uint32_t g = 0; g < n_clusters; g++) {
                 if (used[g]) continue;
                 float dist = 0.0f;
@@ -77,13 +72,13 @@ int main() {
             }
             used[best_g] = 1;
 
-            // Controlla ogni feature del match trovato
             for (uint32_t f = 0; f < n_features; f++) {
                 if (fabsf(local_centroids[k * n_features + f]
                         - golden_centroids[best_g * n_features + f]) > eps)
                     err++;
             }
         }
+        printf("Errors: %d\n", err);
     }
 
     return err;

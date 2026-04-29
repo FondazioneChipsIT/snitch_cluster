@@ -23,9 +23,10 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
     "flw ft5, 0(%[zero])\n"
     "flw ft6, 0(%[zero])\n"
     "flw ft7, 0(%[alpha])\n"
+    "flw ft8, 0(%[beta])\n"
     :
-    : [zero] "r"(&zero), [alpha] "r"(&alpha)
-    : "ft3", "ft4", "ft5", "ft6", "ft7", "ft8");
+    : [zero] "r"(&zero), [alpha] "r"(&alpha), [beta] "r"(&beta)
+    : "ft3", "ft4", "ft5", "ft6", "ft7", "ft8", "memory");
 
     snrt_ssr_enable();
 
@@ -43,13 +44,12 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
             // Explicit assembly to avoid letting the compiler
             // use ft0 (will result in a deadlock as the 
             // SSRs are read before the computation)
-            // ft8 = beta* C_val
+            // ft9 = beta* C_val
             asm volatile(
-            "flw ft8, 0(%[beta])\n"
             "flw ft9, 0(%[ptr])\n"
-            "fmul.s ft8, ft8, ft9\n"
-            ::[beta] "r"(&beta), [ptr] "r"(ptr)
-            : "ft8", "memory");
+            "fmul.s ft9, ft8, ft9\n" 
+            :: [ptr] "r"(ptr)
+            : "ft9", "memory");
 
             asm volatile(
                 "frep.o %[n_frep], 4, 0, 0 \n"  /* Repeat k/4 times: ft3 = ft0 (mat_a) * ft1 (mat_b) + ft3 (acc)*/
@@ -60,12 +60,12 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
 
                 "fadd.s ft3, ft4, ft3\n" /* Reduce the 4 accumulators into one */
                 "fadd.s ft5, ft5, ft3\n" 
-                "fadd.s ft9, ft6, ft5\n" 
+                "fadd.s ft10, ft6, ft5\n" 
 
-                "fmul.s ft9, ft9, ft7\n" /* Multiply by alpha, ft2 = alpha *A*B */
-                "fadd.s ft9, ft9, ft8\n" /* Add beta * c_val, ft2 = alpha *A*B + beta * C_val */
+                "fmul.s ft10, ft10, ft7\n" /* Multiply by alpha, ft2 = alpha *A*B */
+                "fadd.s ft10, ft10, ft9\n" /* Add beta * c_val, ft2 = alpha *A*B + beta * C_val */
 
-                "fsw ft9, 0(%[dst])\n" /* Store result in dst */
+                "fsw ft10, 0(%[dst])\n" /* Store result in dst */
 
                 "fsub.s ft3, ft3, ft3\n" // Reset accs
                 "fsub.s ft4, ft4, ft4\n"
@@ -73,7 +73,7 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
                 "fsub.s ft6, ft6, ft6\n"
                 : 
                 : [n_frep] "r"(k/4 - 1), [dst] "r"(ptr)
-                : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "ft8", "ft9", "memory");
+                : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "ft8", "ft9", "ft10", "memory");
         }    
 
     }

@@ -1,7 +1,7 @@
 #include "math.h"
 #include "snrt.h"
 
-float euclidean_distance_squared(uint32_t n_features, float* p1, float* p2) {
+float euclidean_distance(uint32_t n_features, float* p1, float* p2) {
     float sum = 0.0f;
     //for (uint32_t i = 0; i < n_features; i++) {
     //    float diff = p1[i] - p2[i];
@@ -20,8 +20,10 @@ float euclidean_distance_squared(uint32_t n_features, float* p1, float* p2) {
     // read x and y, write gs
     snrt_ssr_read(SNRT_SSR_DM0,SNRT_SSR_1D, p1);
     snrt_ssr_read(SNRT_SSR_DM1,SNRT_SSR_1D, p2); 
+    snrt_fpu_fence();
     snrt_ssr_enable();
     asm volatile(
+
         "frep.o %[n_frep], 4, 0, 0 \n"  
         "fsub.s ft3, ft0, ft1\n" 
         "fsub.s ft4, ft0, ft1\n"
@@ -32,16 +34,17 @@ float euclidean_distance_squared(uint32_t n_features, float* p1, float* p2) {
         "fsw ft6, 0(%[sum])\n"    // store the result in sum
         : 
         : [n_frep] "r"(n_features/2 - 1), [sum] "r"(&sum)
-        : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "memory");
+        : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "memory");
     snrt_ssr_disable();
+
     return sum;
 }
 
 snrt_barrier_t barr;
 
 void kmeans_iteration(
-    uint32_t  start_idx,    // indice campione iniziale per questo core
-    uint32_t  end_idx,      // indice campione finale (escluso)
+    uint32_t  start_idx,   
+    uint32_t  end_idx,      
     uint32_t  n_clusters,
     uint32_t  n_features,
     float*    samples,      // tutti i campioni in TCDM
@@ -55,21 +58,21 @@ void kmeans_iteration(
     uint32_t core_idx = snrt_cluster_core_idx();
     uint32_t n_cores  = snrt_cluster_compute_core_num();
 
-    // ── Azzeramento accumulatori locali ──────────────────────────────────────
+    
     for (uint32_t k = 0; k < n_clusters; k++) {
         my_cnt[k] = 0;
         for (uint32_t f = 0; f < n_features; f++)
             my_partial[k * n_features + f] = 0.0f;
     }
 
-    // ── Assignment step + accumulo parziale ──────────────────────────────────
+   
     for (uint32_t si = start_idx; si < end_idx; si++) {
         float*   samp     = &samples[si * n_features];
         float    min_dist = __builtin_inff();
         uint32_t best_k   = 0;
 
         for (uint32_t k = 0; k < n_clusters; k++) {
-            float d = euclidean_distance_squared(n_features, samp, &centroids[k * n_features]);
+            float d = euclidean_distance(n_features, samp, &centroids[k * n_features]);
             if (d < min_dist) { min_dist = d; best_k = k; }
         }
 
@@ -97,7 +100,7 @@ void kmeans_iteration(
             }
         }
 
-        // Normalizza → nuovi centroidi scritti in-place
+        // Normalizza -> nuovi centroidi scritti in-place
         for (uint32_t k = 0; k < n_clusters; k++) {
             uint32_t cnt = all_cnt[k];
             if (cnt == 0) continue; // centroide vuoto: lascia invariato
@@ -107,7 +110,6 @@ void kmeans_iteration(
         }
     }
 
-    // Aspetta che core 0 abbia aggiornato i centroidi prima della prossima iterazione
     snrt_partial_barrier(&barr, 8);
     return;
 }

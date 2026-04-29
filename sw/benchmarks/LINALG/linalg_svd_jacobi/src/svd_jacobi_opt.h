@@ -1,160 +1,142 @@
 #include <math.h>
 #include "snrt.h"
 
-snrt_barrier_t barr;
 uint32_t MAX_ITER = 1000;
-float EPSILON = 1e-12f;
+float EPSILON = 1e-5f;
 
-void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S, const uint32_t dim_M){
-    
+snrt_barrier_t   barr;
+volatile float   max_offdiag;
 
-    uint32_t iter;
-    float max_offdiag;
+void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S,
+                    uint32_t dim_M, uint32_t dim_N) {
+    const float zero = 0.0f;
+    const float one  = 1.0f;
+    const float two  = 2.0f;
 
-    uint32_t id = snrt_cluster_core_idx();
+    uint32_t core_idx  = snrt_cluster_core_idx();
     uint32_t NUM_CORES = snrt_cluster_compute_core_num();
-    uint32_t pairs_per_round = dim_M / 2;
 
-    for (iter = 0; iter < MAX_ITER; iter++) {
+    uint32_t pairs_per_round = dim_N / 2;
+    uint32_t num_rounds      = dim_N - 1;
+    uint32_t iter;
 
-        for (uint32_t round = 0; round < (dim_M - 1); round++) {
-            uint32_t pair_start;
-            uint32_t pair_end;
-            uint32_t block;
-            uint32_t left;
+    bool done = false;
 
-            block = pairs_per_round / NUM_CORES;
-            left = pairs_per_round % NUM_CORES;
-            pair_start = id * block + (id < left ? id : left);
-            pair_end = pair_start + block + (id < left ? 1 : 0);
+    for (iter = 0; ((iter < MAX_ITER) && (!done)); iter++) {
 
-            float *ptr = local_max + id;
-            *ptr = 0.0f;
+        for (uint32_t round = 0; ((round < num_rounds) && (!done)); round++) {
 
-            if (pair_start >= pair_end) {
-                return;
-            }
+            /* Reset accumulatore locale (obbligatorio ad ogni round!) */
+            local_max[core_idx] = zero;
 
-            for (uint32_t pair = pair_start; pair < pair_end; pair++) {
-                bool compute;
-                float cos;
-                float sin;
-                float tau;
+            /* ── Distribuzione bilanciata delle coppie ai core ─────────── */
+            uint32_t chunk  = pairs_per_round / NUM_CORES;
+            uint32_t rem    = pairs_per_round % NUM_CORES;
+            uint32_t offset = core_idx * chunk + (core_idx < rem ? core_idx : rem);
+            uint32_t count  = chunk    + (core_idx < rem ? 1u   : 0u);
+
+
+            for (uint32_t k = 0; k < count; k++) {
+                uint32_t pair = offset + k;
+
+                uint32_t i = (round + pair) % (dim_N - 1);
+                uint32_t j = (pair == 0)
+                           ? (dim_N - 1)
+                           : ((dim_N - 1 - pair + round) % (dim_N - 1));
+
+                if (i >= dim_N || j >= dim_N || i == j) continue;
+
+                float alpha = zero, beta = zero, gamma = zero;
+                for (uint32_t m = 0; m < dim_M; m++) {
+                    float ai = mat[m * dim_N + i];
+                    float aj = mat[m * dim_N + j];
+                    alpha += ai * ai;
+                    beta  += aj * aj;
+                    gamma += ai * aj;
+                }
+
+                float abs_gamma = fabsf(gamma);
+
+                if (abs_gamma > local_max[core_idx])
+                    local_max[core_idx] = abs_gamma;
+
+                /* ── Criterio di convergenza relativo ────────────────────
+                 *   +EPSILON al denominatore evita divisione per zero.
+                 * ─────────────────────────────────────────────────────── */
+                if (abs_gamma <= EPSILON * sqrtf(alpha * beta + EPSILON))
+                    continue;
+
+
+                float zeta = (beta - alpha) / (two * gamma);
                 float t;
-                uint32_t i;
-                uint32_t j;
 
-                snrt_partial_barrier(&barr, 8);
+                if (zeta >= zero)
+                    t =  one / ( zeta + sqrtf(one + zeta * zeta));
+                else
+                    t = -one / (-zeta + sqrtf(one + zeta * zeta));
 
-                i = (round + pair) % (dim_M - 1);
-                j = (pair == 0) ? (dim_M - 1) : ((dim_M - 1 - pair + round) % (dim_M - 1));
+                float c = one / sqrtf(one + t * t);
+                float s = t * c;
 
-                compute = true;
-                if (i >= dim_M || j >= dim_M)
-                    compute = false;
-
-                if (fabs(mat[i * dim_M + j]) < EPSILON)
-                    compute = false;
-
-                if (compute) {
-                    tau = (mat[j * dim_M + j] - mat[i * dim_M + i]) / (2.0f * mat[i * dim_M + j]);
-                    if (tau >= 0.0f)
-                        t = 1.0f / (tau + sqrtf(1.0f + tau * tau));
-                    else
-                        t = 1.0f / (tau - sqrtf(1.0f + tau * tau));
-
-                    cos = 1.0f / sqrtf(1.0f + t * t);
-                    sin = t * cos;
-
-                    /* Update rows i and j of MAT */
-                    for (uint32_t m = 0; m < dim_M; m++) {
-                        float im;
-                        float jm;
-
-                        im = mat[i * dim_M + m];
-                        jm = mat[j * dim_M + m];
-
-                        mat[i * dim_M + m] = (cos * im) - (sin * jm);
-                        mat[j * dim_M + m] = (sin * im) + (cos * jm);
-                    }
+                /* Is it possibile to use SSRs?
+                I dont think so, as we would need at leas 2 explicit memory ops, 
+                as we have 3 ssrs lane and we need to read and write mat
+                We could setup, read with ssrs, compute, and setup ssrs for write, but
+                the lost cycles for setup and the fact that we have to read and write 2 columns of mat, makes me think that it is not worth it */
+                for (uint32_t m = 0; m < dim_M; m++) {
+                    float ai = mat[m * dim_N + i];
+                    float aj = mat[m * dim_N + j];
+                    mat[m * dim_N + i] = c * ai - s * aj;
+                    mat[m * dim_N + j] = s * ai + c * aj;
                 }
 
-                snrt_partial_barrier(&barr, 8);
-
-                if (compute) {
-                    /* Update cols i and j of MAT */
-                    for (uint32_t n = 0; n < dim_M; n++) {
-                        float ni;
-                        float nj;
-
-                        ni = mat[n * dim_M + i];
-                        nj = mat[n * dim_M + j];
-
-                        mat[n * dim_M + i] = (cos * ni) - (sin * nj);
-                        mat[n * dim_M + j] = (sin * ni) + (cos * nj);
-                    }
-
-                    /* Update cols i and j of V */
-                    for (uint32_t n = 0; n < dim_M; n++) {
-                        float ni;
-                        float nj;
-
-                        ni = mat_V[n * dim_M + i];
-                        nj = mat_V[n * dim_M + j];
-
-                        mat_V[n * dim_M + i] = (cos * ni) - (sin * nj);
-                        mat_V[n * dim_M + j] = (sin * ni) + (cos * nj);
-                    }
-
-
-                    if (fabs(mat[i * dim_M + j]) > ptr[id])
-                        ptr[id] = fabs(mat[i * dim_M + j]);
+                /* ── Aggiorna colonne i, j di mat_V [dim_N × dim_N] ───── */
+                for (uint32_t n = 0; n < dim_N; n++) {
+                    float vi = mat_V[n * dim_N + i];
+                    float vj = mat_V[n * dim_N + j];
+                    mat_V[n * dim_N + i] = c * vi - s * vj;
+                    mat_V[n * dim_N + j] = s * vi + c * vj;
                 }
 
-            } /* End of pairs for this round */
+            } /* fine ciclo coppie */
 
+            /* ── Barrier + riduzione del massimo off-diagonale ──────────── */
             snrt_partial_barrier(&barr, 8);
 
-            /* Reduction */
-            if (id == 0) {
-                max_offdiag = ptr[0];
-                for (uint32_t cid = 1; cid < NUM_CORES; cid++)
-                    if (ptr[cid] > max_offdiag)
-                        max_offdiag = ptr[cid];
+            if (core_idx == 0) {
+                float mx = local_max[0];
+                for (uint32_t cid = 1; cid < 8; cid++)
+                    if (local_max[cid] > mx) mx = local_max[cid];
+                max_offdiag = mx;
             }
 
             snrt_partial_barrier(&barr, 8);
 
-            if (max_offdiag < EPSILON)
-                break;
+            if (max_offdiag <= EPSILON)
+                done = true;
 
-        }   /* Round */
+        } /* fine round */
+    } 
 
-
-        if (max_offdiag < EPSILON)
-            break;
-
-
-    }   /* Iters */
-
-
-    uint32_t block;
-    uint32_t start;
-    uint32_t left;
-    uint32_t end;
-
-    block = dim_M / NUM_CORES;
-    left = dim_M % NUM_CORES;
-    start = id * block + (id < left ? id : left);
-    end = start + block + (id < left ? 1 : 0);
+    
+    
+    uint32_t chunk = dim_N / NUM_CORES;
+    uint32_t rem   = dim_N % NUM_CORES;
+    uint32_t start = core_idx * chunk + (core_idx < rem ? core_idx : rem);
+    uint32_t end   = start + chunk    + (core_idx < rem ? 1u      : 0u);
 
     for (uint32_t i = start; i < end; i++) {
-        if (mat[i * dim_M + i] > 0)
-            vec_S[i] = sqrtf(mat[i * dim_M + i]);
-        else
-            vec_S[i] = 0;
+        float norm_sq = zero;
+        for (uint32_t m = 0; m < dim_M; m++) {
+            float ai = mat[m * dim_N + i];
+            norm_sq += ai * ai;
+        }
+        vec_S[i] = (norm_sq > zero) ? sqrtf(norm_sq) : zero;
     }
 
+    if(core_idx == 0){
+        printf("Num of iter: %u\n", iter);
+    }
     snrt_partial_barrier(&barr, 8);
 
     return;

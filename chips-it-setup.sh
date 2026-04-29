@@ -26,3 +26,4 @@ export SN_LLVM_BINROOT=/opt/riscv/snitch-llvm-15.0.0-snitch-0.2.0/bin
 
 # Add simulator binaries to PATH
 export PATH=$PWD/target/sim/build/bin:$PATH
+source my_env/bin/activate
