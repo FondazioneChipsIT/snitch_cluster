@@ -2,7 +2,7 @@ import numpy as np
 import os
 
 # -- Parameters ----------------------------------------------------------------
-M = 32        # rows
+M = 64        # rows
 N = 32        # cols  (M >= N assumed  tall/square matrix)
 K = min(M, N)   # number of singular values
 
@@ -99,8 +99,8 @@ with open(file_path, "w") as f:
 print(f"data.h successfully generated at: {file_path}")
 
 # -- Quick sanity check --------------------------------------------------------
-recon  = (U_gold.astype(np.float64)
-          * s_gold.astype(np.float64)
-          ) @ V_gold.T.astype(np.float64)
-err    = np.max(np.abs(recon - mat.astype(np.float64)))
+recon  = (U_gold.astype(np.float32)
+          * s_gold.astype(np.float32)
+          ) @ V_gold.T.astype(np.float32)
+err    = np.max(np.abs(recon - mat.astype(np.float32)))
 print(f"Max reconstruction error |A - U·S·V?|8 = {err:.3e}  (should be < 1e-4)")

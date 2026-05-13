@@ -15,8 +15,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 parser = argparse.ArgumentParser(description="Generate data.h for residual kernel")
-parser.add_argument("-M", type=int, default=256,  help="Number of rows    (default 64)")
-parser.add_argument("-N", type=int, default=768, help="Number of columns (default 128)")
+parser.add_argument("-M", type=int, default=64,  help="Number of rows    (default 64)")
+parser.add_argument("-N", type=int, default=64, help="Number of columns (default 64)")
 parser.add_argument("-o", "--output", default=str(SCRIPT_DIR / "data.h"),
                     help="Output header file (default: <script_dir>/data.h)")
 parser.add_argument("--seed", type=int, default=42, help="Random seed (default 42)")

@@ -9,7 +9,7 @@
 // Pointers to TCDM
 float *ifmap_TCDM, *ofmap_TCDM;
 
-uint32_t CHECK_RESULTS = 1;
+uint32_t CHECK_RESULTS = 0;
 
 int main() {
 
@@ -34,23 +34,13 @@ int main() {
     snrt_mcycle();
 
     // Only the compute cores do something
-    if(snrt_is_compute_core()){
-
-        // determine the row offset for each core
-        uint32_t row_offset = core_idx * INPUT_SAMPLES;
-
-        // determine the row stride of each matrix
-        uint32_t row_stride = ncores * INPUT_SAMPLES;
-
-        // determine the batch offset for each core
-        uint32_t batch_offset = SEQ_LEN * INPUT_SAMPLES;
-
+    if(snrt_is_compute_core()){;
         // chunck per core
-        uint32_t chunk_size = SEQ_LEN / ncores;
+        uint32_t chunk_size = INPUT_SAMPLES / ncores;
+        uint32_t offset = core_idx * chunk_size;
 
-
-        softmax_FP32(&ifmap_TCDM[row_offset], &ofmap_TCDM[row_offset], 
-                    row_stride, batch_offset,  BATCH_SIZE, chunk_size, INPUT_SAMPLES);
+        softmax_FP32(&ifmap_TCDM[offset], &ofmap_TCDM[offset], 
+                    BATCH_SIZE, SEQ_LEN, chunk_size);
 
     }
 

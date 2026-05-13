@@ -15,9 +15,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # ──────────────────────────────────────────────
 #  Configuration
 # ──────────────────────────────────────────────
-BATCH_SIZE     = 3
-SEQ_LEN        = 16
-INPUT_SAMPLES  = 4
+BATCH_SIZE     = 1
+SEQ_LEN        = 1
+INPUT_SAMPLES  = 3144
 DTYPE          = "FP32"
 SEED           = 42          # set to None for a random seed
 # ──────────────────────────────────────────────

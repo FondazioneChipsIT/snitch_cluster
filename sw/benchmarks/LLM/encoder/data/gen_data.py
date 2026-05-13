@@ -4,9 +4,9 @@ import os
 # ─────────────────────────────────────────────
 #  GPT-2 124M encoder parameters
 # ─────────────────────────────────────────────
-B      = 2          # batch size
-T      = 32         # sequence length
-C      = 64        # embedding / channel dimension
+B      = 1          # batch size
+T      = 8         # sequence length
+C      = 768        # embedding / channel dimension
 V      = 512      # vocab size (50257 padded to nearest multiple of 64)
 MAX_T  = T          # max positional embedding length (== T for this test)
 

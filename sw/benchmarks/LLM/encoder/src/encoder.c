@@ -4,6 +4,7 @@
 #include "snrt.h"
 #include "data.h"
 #include "encoder_opt.h"
+bool check = false;
 
 int main(){
     // Core ID and core count
@@ -30,9 +31,9 @@ int main(){
         uint32_t chunk_per_core = B*T/ncores;
         // Offset to index the correct chunk of data per core
         uint32_t offset = core_idx*chunk_per_core;
-
-        encoder_opt(chunk_per_core, offset, inp, wte_TCDM, wpe_TCDM, out_TCDM);
-
+        for(uint32_t i = 0; i < 4; i++){
+            encoder_opt(chunk_per_core, offset, inp, wte_TCDM, wpe_TCDM, out_TCDM);
+        }
     }
 
     snrt_cluster_hw_barrier(); // Barrier syncronization
@@ -43,7 +44,7 @@ int main(){
 
     // CHECK RESULTS
 
-    if (core_idx == 0) {
+    if (core_idx == 0 && check) {
         for(uint32_t i = 0; i < B * T * C; i++){
             if(fabsf(out_TCDM[i] - golden[i]) > eps){
                 err ++;

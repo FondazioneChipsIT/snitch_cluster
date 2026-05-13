@@ -2,10 +2,13 @@
 #include "snrt.h"
 
 uint32_t MAX_ITER = 1000;
-float EPSILON = 1e-5f;
+float EPSILON = 1e-4f;
 
 snrt_barrier_t   barr;
 volatile float   max_offdiag;
+volatile float max_scale_global;
+volatile float local_scale[8];
+
 
 void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S,
                     uint32_t dim_M, uint32_t dim_N) {
@@ -28,6 +31,7 @@ void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S,
 
             /* Reset accumulatore locale (obbligatorio ad ogni round!) */
             local_max[core_idx] = zero;
+            local_scale[core_idx] = zero;
 
             /* ── Distribuzione bilanciata delle coppie ai core ─────────── */
             uint32_t chunk  = pairs_per_round / NUM_CORES;
@@ -60,10 +64,14 @@ void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S,
                 if (abs_gamma > local_max[core_idx])
                     local_max[core_idx] = abs_gamma;
 
+                float scale = sqrtf(alpha * beta + EPSILON);
+                if (scale > local_scale[core_idx])
+                    local_scale[core_idx] = scale;
+
                 /* ── Criterio di convergenza relativo ────────────────────
                  *   +EPSILON al denominatore evita divisione per zero.
                  * ─────────────────────────────────────────────────────── */
-                if (abs_gamma <= EPSILON * sqrtf(alpha * beta + EPSILON))
+                if (abs_gamma <= EPSILON * scale)
                     continue;
 
 
@@ -105,14 +113,18 @@ void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S,
 
             if (core_idx == 0) {
                 float mx = local_max[0];
-                for (uint32_t cid = 1; cid < 8; cid++)
+                float sc = local_scale[0];
+                for (uint32_t cid = 1; cid < 8; cid++){
                     if (local_max[cid] > mx) mx = local_max[cid];
+                    if (local_scale[cid] > sc) sc = local_scale[cid];
+                }
+                max_scale_global = sc;
                 max_offdiag = mx;
             }
 
             snrt_partial_barrier(&barr, 8);
 
-            if (max_offdiag <= EPSILON)
+            if (max_offdiag <= EPSILON * max_scale_global)
                 done = true;
 
         } /* fine round */

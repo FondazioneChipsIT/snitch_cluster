@@ -13,9 +13,9 @@ import os
 # ──────────────────────────────────────────────
 #  Configuration
 # ──────────────────────────────────────────────
-L         = 16    # sequence length (rows of Q / O)
-S         = 16    # key/value length (rows of K / V)
-D         = 16    # head dimension
+L         = 64    # sequence length (rows of Q / O)
+S         = 64    # key/value length (rows of K / V)
+D         = 64    # head dimension
 B_R       = 16    # row block size    (must divide L)
 B_C       = 16    # column block size (must divide S)
 BASELINE  = 0     # 0 = SSR-optimised, 1 = naive GEMM

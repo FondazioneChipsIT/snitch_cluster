@@ -1,0 +1,18 @@
+Kernel: layernorm
+Elements: 1x8x768 x4
+
+Core  Cycles     IPC      FLOPs_alg/cyc   FLOPs_sust/cyc 
+0     44463      0.352    0.1382          0.5535         
+1     44463      0.352    0.1382          0.4154         
+2     44463      0.352    0.1382          0.4154         
+3     44463      0.352    0.1382          0.4154         
+4     44463      0.352    0.1382          0.4154         
+5     44463      0.352    0.1382          0.4154         
+6     44463      0.352    0.1382          0.4154         
+7     44463      0.352    0.1382          0.4154         
+
+Cluster average:
+Cycles mean             : 44463.00
+Total cycles            : 355704.00
+IPC                     : 0.352
+FPU Utilization         : 0.346
