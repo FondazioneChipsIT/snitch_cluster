@@ -47,7 +47,7 @@ void SVM_RBF(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
         inter = 0.0f;
         ptrx = &data_model[i * f_dim];
 
-        for (int k = 0; k < COEF_DIM; k++) {  // coef_dim = 100 support vectors
+        for (int k = 0; k < COEF_DIM; k++) {  //
             ptrs = &x_ref[k * f_dim];
             temp = rbf(ptrx, ptrs, gamma1, f_dim);  // K(xᵢ, sv_k)
             inter += temp * sv_coef[k];             // αₖ · K(...)
@@ -55,6 +55,6 @@ void SVM_RBF(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
         
         Pred[i] = (inter + bias[0] >= 0) ? 1 : 0;
     }
-
+    snrt_fpu_fence();
     return;
 }

@@ -112,6 +112,6 @@ void cholesky_opt(uint32_t core_idx, uint32_t ncores,
         // Barrier to avoid that core 0 starts to compute the next diagonal element before all the elements of the current column are computed
         snrt_partial_barrier(&barr, 8);
     }
-
+    snrt_fpu_fence();
     return;
 }

@@ -61,7 +61,7 @@ float rbf(float *x, float *y, float gamma, int f_dim){
         d1 = x[i+1] - y[i+1];
         sum += d*d + d1*d1;
     }*/
-
+    snrt_fpu_fence();
     return fastexp_gist(gs); 
 }
 
@@ -84,6 +84,6 @@ void SVM_RBF(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
         
         Pred[i] = (inter + bias[0] >= 0) ? 1 : 0;
     }
-
+    snrt_fpu_fence();
     return;
 }

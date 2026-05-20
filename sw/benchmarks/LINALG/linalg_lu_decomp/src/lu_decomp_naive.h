@@ -109,5 +109,6 @@ void lu_decomp_naive(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, 
 
         snrt_partial_barrier(&barr, 8);
     }
-
+    snrt_fpu_fence();
+    return;
 }

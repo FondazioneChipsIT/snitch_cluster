@@ -4,23 +4,40 @@ They have been copied and renamed in this folder for organizations sake.
 
 The matmul kernel is more optimized than the one found in the PLAY_Codes to showcase how one can fully optimize the implementation on Snitch.
 
+# Preparing your kernel
+ 
+To best calculate every performance metric, you should write your code like this:
+
+
+-   `snrt_cluster_hw_barrier();`
+    `snrt_mcycle();`
+    `Part of the code that you want to benchmark`
+    `snrt_cluster_hw_barrier();`
+    `snrt_mcycle();`
+
+Thus all the cores will be synched before running the code.
+
 # Extracting and plotting performance metrics
 Launch the simulation of the code, make the traces found in the log folder with
 
 - `make traces SIM_DIR=. -j`
 
-Afterwards launch the script performance_parsing.py. It will ask as an input the name that will be used to save the files (.txt and .csv), e.g. "matmul". 
-It will also print on the terminal all the cores metrics and the mean ones.
+Afterwards search the traces of the core zero for the two calls of mcycle, and take their PC.
+Call the function pulp_cluster_flop_parsing, with the options:
 
-All the codes implemented in this folder will need this script to extract performance metrics.
-If you add or change a kernel, use the function
+- `--folder logs/`
+- `--start #FIRST mcycle PC#`
+- `--end #second mcycle PC#`
 
-- `mcycle();`
+This will print on the terminal the cycles and flops for each core. 
+If you want to put the result in a .txt, do:
 
-Only before and after the section you want to analyze. This constraint is given by the fact that the script takes the cycles and other parameters in the last section of the traces, where there are the different sections of the code. The only way to divide the code is using this function. The script takes the metrics from section 1 (section 0 being the boot+preparation and section 2 the final one).
+- `python sw/benchmarks/pulp_cluster_flop_parsing.py --folder logs --start "${START_PC}" --end "${END_PC}" > "${OUTPUT_FILE}"`
 
-The script will save a .csv that is updated for each run of the kernel with the same name, and a .txt for each benchmark. The csv can be used to plot, using plot_benchmarks.py.
+# Automatic benchmarking
 
-The plotting script will plot the optimized version against the naive version, if it exists. To use this feature, you must call the kernel that you analyze with performance_parsing.py with a name, for example "matmul", for the opt version, and then the same name plus "_naive", e.g. "matmul_naive". When calling the plotting script use as a name the opt version, e.g. matmul. It will also add the speedup for the algebrical flops (excluding fadd and fsub, that are sometimes used to storeback results). To see all the flops analyze the sustained plot, with the plot_sustained_speedup.py script.
-
-To start, and understand better, check the general results in the results folder. There you will find different kernels, with many runs, naive and optimized versions and the plots.
+The file auto_benchmark.sh automatically does this procedure for each file in its list.
+It compiles all the codes, takes one per one from the list and runs them, makes the traces, and saves the result of the parsing script in the folder result.
+If needed, add and remove kernels from the list.
+WARING: it will take a lot of time to run all the kernels as they are configured right now.
+ 

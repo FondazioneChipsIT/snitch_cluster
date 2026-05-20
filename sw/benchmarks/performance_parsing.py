@@ -60,7 +60,7 @@ log_print(f"Elements: {num_elements}")
 log_print("")
 log_print(
     f"{'Core':<5} {'Cycles':<10} {'IPC':<8} "
-    f"{'FLOPs_alg/cyc':<15} {'FLOPs_sust/cyc':<15}"
+    f"{'FLOPs':<12} {'FLOPs/cycle':<15}"
 )
 
 # ============================
@@ -74,8 +74,8 @@ if not csv_exists:
     csv_writer.writerow([
         "kernel", "elements", "core",
         "cycles", "ipc",
-        "flops_alg_per_cycle",
-        "flops_sust_per_cycle"
+        "flops",
+        "flops_per_cycle"
     ])
 
 # ============================
@@ -84,16 +84,19 @@ if not csv_exists:
 cycles_list = []
 ipc_list = []
 fpu_util_list = []
-flops_alg_list = []
-flops_sust_list = []
+flops_list = []
+flops_pc_list = []
 
 # ============================
 # Lista istruzioni FLOP RISC-V
 # ============================
-fpu_flop_2 = ["fmadd", "fmsub", "fnmadd", "fnmsub"]
+fpu_flop_2 = []
 fpu_flop_1 = [
-    "fadd", "fsub", "fmul", "fdiv",
-    "fsgnj", "fsgnjn", "fsgnjx", "fmin", "fmax"
+    "fadd.", "fsub.", "fmul.", "fdiv.", "fsqrt.",
+    "fmin.", "fmax.", "fabs.",
+    "fcvt.", "feq.", "flt.", "fle.", "fgt.", "fge.",
+    "fsgnj.", "fsgnjn.", "fsgnjx.",
+    "fmsub.", "fnmadd.", "fnmsub.", "fmac.", "fmadd."
 ]
 
 all_fpu_instr = fpu_flop_1 + fpu_flop_2
@@ -122,29 +125,20 @@ for core_id, file_path in enumerate(files):
     cycles = int(re.search(r"^\s*cycles\s+(\d+)", section, re.M).group(1))
     ipc = float(re.search(r"^\s*total_ipc\s+([\d\.]+)", section, re.M).group(1))
     fpu_util = float(re.search(r"^\s*fpss_fpu_occupancy\s+([\d\.]+)", section, re.M).group(1))
-    
+
     # ------------------------
     # CONTO FLOP
     # ------------------------
-    flop_alg = 0
-    flop_sust = 0
+    flops = 0
 
     for line in lines:
         m = pattern.search(line)
         if not m:
             continue
-
         instr = m.group(1).lower()
+        flops += 2 if instr in fpu_flop_2 else 1
 
-        # Sustained FLOPs: tutte le FP ops
-        flop_sust += 2 if instr in fpu_flop_2 else 1
-
-        # Algorithmic FLOPs: solo FMAs
-        if instr in fpu_flop_2:
-            flop_alg += 2
-
-    flops_alg_per_cycle = flop_alg / cycles if cycles > 0 else 0.0
-    flops_sust_per_cycle = flop_sust / cycles if cycles > 0 else 0.0
+    flops_per_cycle = flops / cycles if cycles > 0 else 0.0
 
     # ------------------------
     # Salva dati
@@ -152,19 +146,19 @@ for core_id, file_path in enumerate(files):
     cycles_list.append(cycles)
     ipc_list.append(ipc)
     fpu_util_list.append(fpu_util)
-    flops_alg_list.append(flops_alg_per_cycle)
-    flops_sust_list.append(flops_sust_per_cycle)
+    flops_list.append(flops)
+    flops_pc_list.append(flops_per_cycle)
 
     log_print(
         f"{core_id:<5} {cycles:<10} {ipc:<8.3f} "
-        f"{flops_alg_per_cycle:<15.4f} {flops_sust_per_cycle:<15.4f}"
+        f"{flops:<12} {flops_per_cycle:<15.4f}"
     )
 
     csv_writer.writerow([
         kernel_name, num_elements, core_id,
         cycles, ipc,
-        flops_alg_per_cycle,
-        flops_sust_per_cycle
+        flops,
+        flops_per_cycle
     ])
 
 # ============================
@@ -175,9 +169,8 @@ log_print(f"Cycles mean             : {sum(cycles_list)/len(cycles_list):.2f}")
 log_print(f"Total cycles            : {sum(cycles_list):.2f}")
 log_print(f"IPC                     : {sum(ipc_list)/len(ipc_list):.3f}")
 log_print(f"FPU Utilization         : {sum(fpu_util_list)/len(fpu_util_list):.3f}")
-# Old FLOP count
-#log_print(f"FLOPs_alg/cycle   : {sum(flops_alg_list)/len(flops_alg_list):.4f}")
-#log_print(f"FLOPs_sust/cycle  : {sum(flops_sust_list)/len(flops_sust_list):.4f}")
+log_print(f"FLOPs (total)           : {sum(flops_list)}")
+log_print(f"FLOPs/cycle             : {sum(flops_pc_list)/len(flops_pc_list):.4f}")
 
 txt.close()
 csv_f.close()

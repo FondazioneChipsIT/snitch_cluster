@@ -62,8 +62,7 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
                 "fadd.s ft5, ft5, ft3\n" 
                 "fadd.s ft10, ft6, ft5\n" 
 
-                "fmul.s ft10, ft10, ft7\n" /* Multiply by alpha, ft2 = alpha *A*B */
-                "fadd.s ft10, ft10, ft9\n" /* Add beta * c_val, ft2 = alpha *A*B + beta * C_val */
+                "fmadd.s ft10, ft10, ft7, ft9\n" /* Add beta * c_val, ft10 = alpha *A*B + beta * C_val */
 
                 "fsw ft10, 0(%[dst])\n" /* Store result in dst */
 

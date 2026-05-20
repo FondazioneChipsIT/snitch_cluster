@@ -73,5 +73,6 @@ void conv3x3_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
         
     }
     
+    snrt_fpu_fence();
     return;
 }

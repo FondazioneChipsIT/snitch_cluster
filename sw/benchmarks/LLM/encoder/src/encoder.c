@@ -4,7 +4,7 @@
 #include "snrt.h"
 #include "data.h"
 #include "encoder_opt.h"
-bool check = false;
+bool check = true;
 
 int main(){
     // Core ID and core count
@@ -28,11 +28,11 @@ int main(){
 
         // Compute the chunk of the matrix, represents
         // the number of rows each core has to use
-        uint32_t chunk_per_core = B*T/ncores;
+        uint32_t chunk_per_core = C/ncores;
         // Offset to index the correct chunk of data per core
         uint32_t offset = core_idx*chunk_per_core;
         for(uint32_t i = 0; i < 4; i++){
-            encoder_opt(chunk_per_core, offset, inp, wte_TCDM, wpe_TCDM, out_TCDM);
+            encoder_opt(chunk_per_core, offset, B, T, inp, wte_TCDM, wpe_TCDM, out_TCDM);
         }
     }
 

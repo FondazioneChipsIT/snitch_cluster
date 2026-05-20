@@ -9,70 +9,73 @@ from sklearn.svm import SVC
 # ──────────────────────────────────────────────
 # Benchmark parameters
 # ──────────────────────────────────────────────
-L         = 100   # Number of decision points (test samples)
-COEF_DIM  = 100   # Number of support vectors (training samples, controls coef_dim)
-F_DIM     = 4    # Feature dimension, 4 for BILL
-GAMMA     = 0.5   # RBF kernel bandwidth  γ  (used in exp(-γ ||x-y||²))
+L         = 100   # Number of decision points (test samples)   [n_dec_values]
+SVS       = 100   # Number of training samples (internal – controls how many real SVs are found)
+COEF_DIM  = 115   # Exported array dimension: sv[COEF_DIM*F_DIM], sv_coef[COEF_DIM]
+                  # (>= SVS; the C DMA and kernel loop both use COEF_DIM)
+F_DIM     = 4     # Feature dimension
+N_CLASS   = 2     # Number of classes (binary)
+GAMMA     = 0.5   # RBF kernel bandwidth  gamma  (used in exp(-gamma ||x-y||^2))
 
-assert F_DIM % 2 == 0, "F_DIM must be divisible by 2 (SSR/FREP unroll constraint)"
+assert F_DIM % 2 == 0,   "F_DIM must be divisible by 2 (SSR/FREP unroll constraint)"
+assert COEF_DIM >= SVS,  "COEF_DIM must be >= SVS (padding constraint)"
+assert N_CLASS == 2,     "This generator only supports binary classification"
 
 # ──────────────────────────────────────────────
 # Generate training data and fit SVM
 # ──────────────────────────────────────────────
 rng = np.random.default_rng(42)
 
-# Two-class linearly-separable blobs (gives a clean, small support-vector set)
-half = COEF_DIM // 2
+half = SVS // 2
 X_train = np.vstack([
-    rng.normal(loc=-1.0, scale=0.5, size=(half,     F_DIM)),
-    rng.normal(loc=+1.0, scale=0.5, size=(COEF_DIM - half, F_DIM)),
+    rng.normal(loc=-1.0, scale=0.5, size=(half,       F_DIM)),
+    rng.normal(loc=+1.0, scale=0.5, size=(SVS - half, F_DIM)),
 ]).astype(np.float32)
-y_train = np.array([-1] * half + [1] * (COEF_DIM - half), dtype=np.int32)
+y_train = np.array([-1] * half + [1] * (SVS - half), dtype=np.int32)
 
 clf = SVC(kernel="rbf", gamma=GAMMA, C=1.0)
 clf.fit(X_train, y_train)
 
-# Force exactly COEF_DIM support vectors by using all training points as SVs.
-# (The SVC above may find fewer; if so we pad with zero-weight duplicates so
-#  the array sizes stay fixed and match the #define.)
-sv_raw   = clf.support_vectors_.astype(np.float32)   # shape (n_sv, F_DIM)
-coef_raw = clf.dual_coef_.flatten().astype(np.float32) # shape (n_sv,)
+sv_raw   = clf.support_vectors_.astype(np.float32)     # (n_sv_found, F_DIM)
+coef_raw = clf.dual_coef_.flatten().astype(np.float32) # (n_sv_found,)
 bias_val = float(clf.intercept_[0])
 gamma_val = float(clf.gamma if clf.gamma != "scale" else GAMMA)
 
-n_sv = sv_raw.shape[0]
-if n_sv < COEF_DIM:
-    # Pad with zero-weight duplicate support vectors
-    pad = COEF_DIM - n_sv
-    sv_raw   = np.vstack([sv_raw,   np.zeros((pad, F_DIM), dtype=np.float32)])
-    coef_raw = np.concatenate([coef_raw, np.zeros(pad, dtype=np.float32)])
+n_sv_found = sv_raw.shape[0]
+
+# ── Pad / trim both arrays to exactly COEF_DIM rows ───────────────────────
+# The C code reads COEF_DIM*F_DIM floats from sv[] via DMA and iterates
+# COEF_DIM times in the kernel loop, so BOTH arrays must be sized to COEF_DIM.
+# Zero-padded rows contribute 0 to the decision value (coef = 0).
+if n_sv_found < COEF_DIM:
+    pad = COEF_DIM - n_sv_found
+    sv_out   = np.vstack([sv_raw,   np.zeros((pad, F_DIM), dtype=np.float32)])
+    coef_out = np.concatenate([coef_raw, np.zeros(pad,     dtype=np.float32)])
 else:
-    sv_raw   = sv_raw[:COEF_DIM]
-    coef_raw = coef_raw[:COEF_DIM]
+    sv_out   = sv_raw[:COEF_DIM]
+    coef_out = coef_raw[:COEF_DIM]
 
 # ──────────────────────────────────────────────
 # Generate test data and compute golden predictions
 # ──────────────────────────────────────────────
 X_test = rng.uniform(-2.0, 2.0, size=(L, F_DIM)).astype(np.float32)
 
-# Re-implement the exact C decision rule:
-#   decision(x) = Σ_k  coef[k] · exp(-γ ||x - sv[k]||²)  + bias
-#   label        = (decision >= 0) ? 1 : 0
+# Mirrors the C decision rule exactly:
+#   decision(x) = sum_{k=0}^{COEF_DIM-1} coef[k] * exp(-gamma ||x - sv[k]||^2) + bias
+#   label = (decision >= 0) ? 1 : 0
 def rbf_kernel_matrix(X, Y, gamma):
-    """Compute K[i,k] = exp(-gamma * ||X[i] - Y[k]||²)."""
-    diff = X[:, None, :] - Y[None, :, :]          # (L, COEF_DIM, F_DIM)
-    sq   = np.sum(diff ** 2, axis=-1)              # (L, COEF_DIM)
+    diff = X[:, None, :] - Y[None, :, :]   # (L, COEF_DIM, F_DIM)
+    sq   = np.sum(diff ** 2, axis=-1)       # (L, COEF_DIM)
     return np.exp(-gamma * sq).astype(np.float32)
 
-K      = rbf_kernel_matrix(X_test, sv_raw, gamma_val)   # (L, COEF_DIM)
-dec    = K @ coef_raw + bias_val                         # (L,)
-golden = (dec >= 0).astype(np.float32)                   # 1.0 or 0.0
+K      = rbf_kernel_matrix(X_test, sv_out, gamma_val)  # (L, COEF_DIM)
+dec    = K @ coef_out + bias_val                        # (L,)
+golden = (dec >= 0).astype(np.float32)                  # 1.0 or 0.0
 
 # ──────────────────────────────────────────────
-# C array helpers  (same style as conv generator)
+# C array helpers
 # ──────────────────────────────────────────────
 def vec_to_c_array(name, arr, n):
-    """1-D float array."""
     c = f"float {name}[{n}] = {{\n"
     for i in range(0, n, 8):
         row = arr[i:i+8]
@@ -81,7 +84,6 @@ def vec_to_c_array(name, arr, n):
     return c
 
 def matrix_to_c_array(name, mat, rows, cols):
-    """2-D float array stored row-major as 1-D C array."""
     flat = mat.flatten()
     c    = f"float {name}[{rows} * {cols}] = {{\n"
     for i in range(rows):
@@ -98,54 +100,57 @@ file_path  = os.path.join(script_dir, "data.h")
 
 with open(file_path, "w") as f:
     f.write("// Luca Colombo Chips-IT 2026\n")
-    f.write("// Auto-generated by gen_data_svm_rbf.py – do not edit manually\n\n")
+    f.write("// Auto-generated by gen_data_svm_rbf.py - do not edit manually\n\n")
     f.write("#ifndef DATA_H\n")
     f.write("#define DATA_H\n\n")
 
     # ── Dimension defines ──────────────────────────────────────────────
     f.write("/* Number of decision points (test samples) */\n")
-    f.write(f"#define L         {L}\n\n")
+    f.write(f"#define L           {L}\n\n")
 
-    f.write("/* Number of support vectors */\n")
-    f.write(f"#define COEF_DIM  {COEF_DIM}\n\n")
+    f.write("/* Coefficient / SV array dimension used by DMA and kernel loop */\n")
+    f.write(f"#define COEF_DIM    {COEF_DIM}\n\n")
 
-    f.write("/* Feature dimension (must be divisible by 4 for SSR/FREP unroll) */\n")
-    f.write(f"#define F_DIM     {F_DIM}\n\n")
+    f.write("/* Feature dimension (must be divisible by 2 for SSR/FREP unroll) */\n")
+    f.write(f"#define F_DIM       {F_DIM}\n\n")
+
+    f.write("/* Number of classes */\n")
+    f.write(f"#define N_CLASS     {N_CLASS}\n\n")
 
     # ── Scalar parameters ──────────────────────────────────────────────
-    f.write("/* RBF bandwidth parameter γ */\n")
-    f.write(f"#define GAMMA     {gamma_val:.6f}f\n\n")
+    f.write("/* RBF bandwidth parameter gamma */\n")
+    f.write(f"#define GAMMA       {gamma_val:.6f}f\n\n")
 
     # ── TCDM runtime pointers ──────────────────────────────────────────
-    # Layout (same pattern as conv generator):
-    #   input_TCDM  → data_model  [L × F_DIM]
-    #   dst_TCDM    → Pred        [L]          (after data_model)
-    #   sv_TCDM     → x_ref       [COEF_DIM × F_DIM]
-    f.write("/* TCDM pointers – filled at runtime by the DM core */\n")
-    f.write("float *data_model_TCDM;   /* data_model  [L * F_DIM]         */\n")
-    f.write("float *pred_TCDM;         /* Pred        [L]                 */\n")
-    f.write("float *x_ref_TCDM;        /* x_ref       [COEF_DIM * F_DIM]  */\n\n")
-    f.write("float *sv_coef_TCDM;      /* sv_coef     [COEF_DIM]          */\n\n")
+    f.write("/* TCDM pointers - filled at runtime by the DM core */\n")
+    f.write("float *data_model_TCDM;   /* data_model  [L * F_DIM]          */\n")
+    f.write("float *pred_TCDM;         /* Pred        [L]                  */\n")
+    f.write("float *x_ref_TCDM;        /* x_ref       [COEF_DIM * F_DIM]   */\n")
+    f.write("float *sv_coef_TCDM;      /* sv_coef     [COEF_DIM]           */\n\n")
 
     # ── Static data arrays ─────────────────────────────────────────────
-    f.write("/* Input data points – row-major, L × F_DIM */\n")
+    f.write("/* Input data points - row-major, L x F_DIM */\n")
     f.write(matrix_to_c_array("data_model", X_test, L, F_DIM) + "\n")
 
-    f.write("/* Support vectors – row-major, COEF_DIM × F_DIM */\n")
-    f.write(matrix_to_c_array("sv", sv_raw, COEF_DIM, F_DIM) + "\n")
+    f.write(f"/* Support vectors - row-major, COEF_DIM x F_DIM */\n")
+    f.write(f"/* Rows [{n_sv_found}..{COEF_DIM-1}] are zero-padded (coef=0, no contribution) */\n")
+    f.write(matrix_to_c_array("sv", sv_out, COEF_DIM, F_DIM) + "\n")
 
-    f.write("/* Dual coefficients  αₖ · yₖ  – length COEF_DIM */\n")
-    f.write(vec_to_c_array("sv_coef", coef_raw, COEF_DIM) + "\n")
+    f.write(f"/* Dual coefficients alpha_k * y_k - length COEF_DIM */\n")
+    f.write(f"/* Entries [{n_sv_found}..{COEF_DIM-1}] are 0.0 (padding) */\n")
+    f.write(vec_to_c_array("sv_coef", coef_out, COEF_DIM) + "\n")
 
     f.write("/* Bias term (intercept) */\n")
     f.write(f"float bias[1] = {{ {bias_val:.6f}f }};\n\n")
 
-    f.write("/* Golden binary predictions (1.0 or 0.0) – length L */\n")
+    f.write("/* Golden binary predictions (1.0 or 0.0) - length L */\n")
     f.write(vec_to_c_array("golden", golden, L) + "\n")
 
     f.write("#endif /* DATA_H */\n")
 
 print(f"data.h successfully generated at: {file_path}")
 print(f"  L={L}, COEF_DIM={COEF_DIM}, F_DIM={F_DIM}, gamma={gamma_val:.4f}")
-print(f"  Support vectors found by SVC: {n_sv}  (padded to {COEF_DIM})")
+print(f"  SVs found by SVC : {n_sv_found}  ->  padded to COEF_DIM={COEF_DIM}")
+print(f"  sv[]     : {COEF_DIM} x {F_DIM}  (matches DMA: COEF_DIM*F_DIM floats)")
+print(f"  sv_coef[]: {COEF_DIM}             (matches DMA: COEF_DIM floats)")
 print(f"  Positive predictions in golden: {int(golden.sum())} / {L}")

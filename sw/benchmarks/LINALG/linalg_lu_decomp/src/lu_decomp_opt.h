@@ -156,7 +156,7 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
     
 
     }
-        
+    snrt_fpu_fence();
     return;
 }
 

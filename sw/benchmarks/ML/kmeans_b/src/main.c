@@ -4,6 +4,8 @@
 
 uint32_t CHECK_RESULTS = 1;
 
+uint32_t max_iter = 1000;
+
 int main() {
     uint32_t core_idx = snrt_cluster_core_idx();
     uint32_t n_cores  = snrt_cluster_compute_core_num();
@@ -15,19 +17,28 @@ int main() {
 
     // ── Layout TCDM ──────────────────────────────────────────────────────────
     float*    local_samples   = (float*)snrt_l1_next();
-    float*    local_centroids = local_samples   + n_samples  * n_features;
+    float*    local_delta = local_samples + n_samples * n_features;
+    float*    local_centroids = local_delta   + n_cores;
     float*    partial_cents   = local_centroids + n_clusters * n_features;
     uint32_t* membership      = (uint32_t*)(partial_cents + n_cores * n_clusters * n_features);
-    uint32_t* partial_cnt     = membership + n_samples;
+    uint32_t* partial_cnt     = membership + n_samples;;
 
+    float zero[8] = {0.0f};
+    // Init membership to 0
+    for (int i = 0; i < n_samples; i++) {
+        membership[i] = 0;
+    }
     // ── DMA ──────────────────────────────────────────────────────────────────
     if (snrt_is_dm_core()) {
         snrt_dma_start_1d(local_samples,   (float*)samples,
                           n_samples  * n_features * sizeof(float));
         snrt_dma_start_1d(local_centroids, (float*)centroids,
                           n_clusters * n_features * sizeof(float));
+        snrt_dma_start_1d(local_delta, (float*)zero,
+                          n_cores * sizeof(float));
         snrt_dma_wait_all();
     }
+
     snrt_cluster_hw_barrier();
     snrt_mcycle();
 
@@ -35,16 +46,14 @@ int main() {
         float*    my_partial = partial_cents + core_idx * n_clusters * n_features;
         uint32_t* my_cnt     = partial_cnt   + core_idx * n_clusters;
 
-        for (uint32_t iter = 0; iter < n_iter; iter++) {
             kmeans_iteration(
                 start_idx, end_idx,
                 n_clusters, n_features,
                 local_samples, membership,
                 my_cnt,        local_centroids,
-                my_partial,    partial_cnt, partial_cents
+                my_partial,    partial_cnt, partial_cents, max_iter, n_samples,
+                local_delta
             );
-            snrt_partial_barrier(&barr, 8);
-        }
     }
 
     snrt_cluster_hw_barrier();

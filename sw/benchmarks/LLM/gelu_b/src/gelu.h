@@ -56,16 +56,14 @@ static inline float sigmoid_gelu_fp32(float x, float a, float b) {
 
 // Single-cluster GeLU
 static inline void gelu_fp32(float *input, float *output, uint32_t size) {
-    snrt_snrt_cluster_hw_barrier();
-    snrt_mcycle();
+    
     if (snrt_is_compute_core()) {
         for (uint32_t i = 0; i < size; i++) {
             output[i] = sigmoid_gelu_fp32(input[i], -0.2888, -1.769);
             // output[i] = gelu_activation_fp32(input[i]);
         }
     }
-    snrt_snrt_cluster_hw_barrier();
-    snrt_mcycle();
+    
 }
 
 // Parallel GeLU layer with DMA transfers
@@ -93,11 +91,12 @@ static inline void gelu_layer(const gelu_layer_t l) {
     }
 
     snrt_cluster_hw_barrier();
-
+    snrt_mcycle();
     // Cluster computation
     gelu_fp32(l1_ifmap, l1_ofmap, cluster_fmap_size);
 
     snrt_cluster_hw_barrier();
+    snrt_mcycle();
 
     // DMA transfer the ofmap to DRAM
     if (snrt_is_dm_core()) {

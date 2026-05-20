@@ -3,27 +3,28 @@ import os
 
 # ── Parameters ────────────────────────────────────────────────────────────────
 BATCH_SIZE  = 1
-SEQ_LEN     = 8     # must be multiple of ncores (8)
-EMBEDDINGS  = 768    # must be multiple of 8 (UNROLL * num_elems_per_vector)
-EPS         = 1e-5  # float in C
+SEQ_LEN     = 8
+EMBEDDINGS  = 768
+EPS         = 1e-5
 CHECK_RESULTS = True
 
-# ── Random input ──────────────────────────────────────────────────────────────
-rng   = np.random.default_rng(42)
+# ── Random input + affine params ──────────────────────────────────────────────
+rng        = np.random.default_rng(42)
 input_data = rng.random((BATCH_SIZE, SEQ_LEN, EMBEDDINGS)).astype(np.float32)
+weight     = rng.random(EMBEDDINGS).astype(np.float32)   # γ  shape: [EMBEDDINGS]
+bias       = rng.random(EMBEDDINGS).astype(np.float32)   # β  shape: [EMBEDDINGS]
 
-# ── Golden model: exact replica of layernorm_naive ────────────────────────────
-# eps_f used in golden model
-eps_f = float(EPS)
-
+# ── Golden model ──────────────────────────────────────────────────────────────
+eps_f    = float(EPS)
 O_golden = np.zeros_like(input_data)
+
 for b in range(BATCH_SIZE):
     for s in range(SEQ_LEN):
         row  = input_data[b, s, :]
         mean = np.sum(row) / EMBEDDINGS
         var  = np.sum((row - mean) ** 2) / EMBEDDINGS
         std  = np.sqrt(var + eps_f)
-        O_golden[b, s, :] = (row - mean) / std
+        O_golden[b, s, :] = (row - mean) / std * weight + bias
 
 # ── C array helper ────────────────────────────────────────────────────────────
 def matrix_to_c(name, arr, per_row=8):
@@ -51,22 +52,29 @@ with open(file_path, "w") as f:
     f.write(f"uint32_t SEQ_LEN =     {SEQ_LEN};\n")
     f.write(f"uint32_t EMBEDDINGS =  {EMBEDDINGS};\n")
     f.write(f"/* EPS is float in the kernel */\n")
-    f.write(f"float EPS =         {EPS}f;\n")
-    f.write(f"/* Flag to check results*/\n")
-    f.write(f"bool CHECK_RESULTS =  {1 if CHECK_RESULTS else 0};\n")
+    f.write(f"float EPS =            {EPS}f;\n")
+    f.write(f"/* Flag to check results */\n")
+    f.write(f"bool CHECK_RESULTS =   {1 if CHECK_RESULTS else 0};\n\n")
 
     f.write("/* TCDM pointers – filled at runtime by DM core */\n")
     f.write("float *ifmap_TCDM;\n")
-    f.write("float *ofmap_TCDM;\n\n")
+    f.write("float *ofmap_TCDM;\n")
+    f.write("float *weight_TCDM;\n")
+    f.write("float *bias_TCDM;\n\n")
 
-    f.write(f"/* Input tensor [BATCH_SIZE x SEQ_LEN x EMBEDDINGS] = [{total_elems}] – row-major */\n")
+    f.write(f"/* Input tensor [{BATCH_SIZE} x {SEQ_LEN} x {EMBEDDINGS}] = [{total_elems}] – row-major */\n")
     f.write(matrix_to_c("input", input_data) + "\n")
 
-    f.write(f"/* Golden output: layernorm per row, eps = {eps_f}f */\n")
+    f.write(f"/* Affine parameters – shape: [EMBEDDINGS] = [{EMBEDDINGS}] */\n")
+    f.write(matrix_to_c("weight", weight) + "\n")
+    f.write(matrix_to_c("bias",   bias)   + "\n")
+
+    f.write(f"/* Golden output: layernorm + affine, eps = {eps_f}f */\n")
     f.write(matrix_to_c("O_golden", O_golden) + "\n")
 
     f.write("#endif /* DATA_H */\n")
 
-print(f"data.h successfully generated at: {file_path}")
-print(f"Total elements: {total_elems}")
-print(f"EPS as float: {eps_f}")
+print(f"data.h written to: {file_path}")
+print(f"Total input elements : {total_elems}")
+print(f"Weight/bias elements : {EMBEDDINGS}")
+print(f"EPS as float         : {eps_f}")

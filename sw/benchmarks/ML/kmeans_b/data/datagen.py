@@ -6,7 +6,7 @@ n_samples  = 100
 n_features = 8
 n_clusters = 8
 seed       = 42
-max_iter   = 5
+max_iter   = 8
 
 X, _ = make_blobs(n_samples=n_samples, n_features=n_features,
                   centers=n_clusters, random_state=seed)

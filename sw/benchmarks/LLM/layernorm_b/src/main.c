@@ -18,9 +18,13 @@ int main() {
 
         ifmap_TCDM = (float *)snrt_l1_next();
         ofmap_TCDM = ifmap_TCDM + total_elems;
+        weight_TCDM = ofmap_TCDM + total_elems;
+        bias_TCDM = weight_TCDM + EMBEDDINGS;
         size_t size = total_elems * sizeof(float);
 
         snrt_dma_start_1d(ifmap_TCDM, input, size);
+        snrt_dma_start_1d(weight_TCDM, weight, EMBEDDINGS * sizeof(float));
+        snrt_dma_start_1d(bias_TCDM, bias, EMBEDDINGS * sizeof(float));
         snrt_dma_wait_all();
     }
 
@@ -35,7 +39,7 @@ int main() {
         uint32_t offset = core_idx * rows_per_core * EMBEDDINGS;
 
         for(uint32_t i = 0; i < 4; i++){
-            layernorm(ifmap_TCDM + offset, ofmap_TCDM + offset, rows_per_core);
+            layernorm(ifmap_TCDM + offset, ofmap_TCDM + offset, weight_TCDM, bias_TCDM, rows_per_core);
         }
     }
 

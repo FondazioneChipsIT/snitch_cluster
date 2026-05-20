@@ -146,10 +146,7 @@ void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S,
         vec_S[i] = (norm_sq > zero) ? sqrtf(norm_sq) : zero;
     }
 
-    if(core_idx == 0){
-        printf("Num of iter: %u\n", iter);
-    }
     snrt_partial_barrier(&barr, 8);
-
+    snrt_fpu_fence();
     return;
 }
