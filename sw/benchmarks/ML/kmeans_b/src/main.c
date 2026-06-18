@@ -1,5 +1,6 @@
 #include "snrt.h"
-#include "data.h"
+#include "data_def.h"
+#include "out_ref.h"
 #include "kmeans_new.h"
 
 uint32_t CHECK_RESULTS = 1;
@@ -22,6 +23,7 @@ int main() {
     float*    partial_cents   = local_centroids + n_clusters * n_features;
     uint32_t* membership      = (uint32_t*)(partial_cents + n_cores * n_clusters * n_features);
     uint32_t* partial_cnt     = membership + n_samples;;
+    float*    golden_L1 = (float*)partial_cnt + n_cores * n_clusters;
 
     float zero[8] = {0.0f};
     // Init membership to 0
@@ -36,6 +38,8 @@ int main() {
                           n_clusters * n_features * sizeof(float));
         snrt_dma_start_1d(local_delta, (float*)zero,
                           n_cores * sizeof(float));
+        snrt_dma_start_1d(golden_L1, (float*)golden_centroids,
+                          n_clusters * n_features * sizeof(float));
         snrt_dma_wait_all();
     }
 
@@ -60,11 +64,10 @@ int main() {
     snrt_mcycle();
 
     uint32_t err = 0;
-    float    eps = 0.1f; 
-
+    float    eps = threshold; 
+    
     if (CHECK_RESULTS == 1 && core_idx == 0) {
         uint32_t used[8] = {0}; 
-        printf("Golden check!\n");
         for (uint32_t k = 0; k < n_clusters; k++) {
             float    best_dist = __builtin_inff();
             uint32_t best_g    = 0;
@@ -87,8 +90,7 @@ int main() {
                     err++;
             }
         }
-        printf("Errors: %d\n", err);
     }
-
+    
     return err;
 }

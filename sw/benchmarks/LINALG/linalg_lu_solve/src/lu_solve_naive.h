@@ -14,7 +14,7 @@ void lu_solve_naive(float *mat, uint32_t *perm, float *y, float *vec, float *res
     // -------------------------
     // FORWARD SUBSTITUTION (L * y = P * vec)
     // -------------------------
-    for (uint32_t m = 0; m < elems; m++) {
+    for (uint32_t m = 0; m < N; m++) {
         
         // reset buffer
         local_sum[core_idx] = 0.0f;
@@ -29,7 +29,7 @@ void lu_solve_naive(float *mat, uint32_t *perm, float *y, float *vec, float *res
         uint32_t end   = start + block + (core_idx < (uint32_t)left ? 1 : 0);
 
         for (uint32_t k = start; k < end; k++)
-            local_sum[core_idx] += mat[m * elems + k] * y[k];
+            local_sum[core_idx] += mat[m * N + k] * y[k];
         
 
         // barrier: attendi che tutti i core finiscano
@@ -51,12 +51,12 @@ void lu_solve_naive(float *mat, uint32_t *perm, float *y, float *vec, float *res
 
     // BACKWARD SUBSTITUTION (U * result = y)
     
-    for (int m = (int) elems - 1; m >=0; m--) {
+    for (int m = (int) N - 1; m >=0; m--) {
        
         local_sum[core_idx] = 0.0f;
         
-         // la finestra su cui sommare è k in [m+1, elems)
-        uint32_t count = (uint32_t)elems - (m + 1); // numero elementi nella finestra, può essere 0
+        // la finestra su cui sommare è k in [m+1, N)
+        uint32_t count = (uint32_t)N - (m + 1); // numero elementi nella finestra, può essere 0
         uint32_t block = count / (uint32_t)ncores;
         uint32_t left  = count % (uint32_t)ncores;
 
@@ -69,7 +69,7 @@ void lu_solve_naive(float *mat, uint32_t *perm, float *y, float *vec, float *res
         snrt_partial_barrier(&barr, 8);
 
         for (uint32_t k = start; k < end; k++)
-            local_sum[core_idx] += mat[m * elems + k] * result[k];
+            local_sum[core_idx] += mat[m * N + k] * result[k];
         
 
         snrt_partial_barrier(&barr, 8);
@@ -79,7 +79,7 @@ void lu_solve_naive(float *mat, uint32_t *perm, float *y, float *vec, float *res
             float sum = 0.0f;
             for (uint32_t i = 0; i < ncores; i++)
                 sum += local_sum[i];
-            result[m] = (y[m] - sum) / mat[m * elems + m];
+            result[m] = (y[m] - sum) / mat[m * N + m];
         }
      
     }

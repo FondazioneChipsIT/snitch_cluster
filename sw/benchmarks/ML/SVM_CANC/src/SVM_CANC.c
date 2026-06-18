@@ -37,7 +37,10 @@ int main(){
     if(snrt_is_compute_core()){
 
         uint32_t chunk_per_core = L / ncores;
-        uint32_t offset = core_idx * chunk_per_core;
+        uint32_t remainder = L % ncores;
+        uint32_t offset = core_idx * chunk_per_core + (core_idx < remainder ? core_idx : remainder);
+        chunk_per_core += (core_idx < remainder) ? 1 : 0;
+
         
         SVM_RBF(core_idx, chunk_per_core, offset, 
                 data_model_TCDM, pred_TCDM, x_ref_TCDM, bias, sv_coef_TCDM, GAMMA, F_DIM);

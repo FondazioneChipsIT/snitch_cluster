@@ -141,9 +141,8 @@ void lu_decomp_opt(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, ui
             snrt_ssr_enable();
 
             asm volatile(
-            "frep.o %[n_frep], 2, 0, 0 \n"  // repeat the next 2 instructions
-            "fmul.s ft4, ft0, ft3\n" // ft4 = ft0 (pivot row) * ft3 (factor)
-            "fsub.s ft2, ft1, ft4\n" // ft2 = ft1 (current row) - ft4 (result)
+            "frep.o %[n_frep], 1, 0, 0 \n"  // repeat the next instruction
+            "fmsub.s ft2, ft0, ft3, ft1\n" // ft2 = ft1 (current row) - ft0 (pivot row) * ft3 (factor)
             :
             : [n_frep] "r"(row_chunk - 1)
             : "ft0", "ft1", "ft2", "ft3", "ft4", "memory");

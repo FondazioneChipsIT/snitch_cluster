@@ -7,7 +7,6 @@
 #include "data.h"
 // Where LU matrix is stored
 #include "data_LU.h"
-#include "lu_solve_opt.h"
 #include "lu_solve_naive.h"
 
 
@@ -19,20 +18,20 @@ int main() {
     if (snrt_is_dm_core()) {
 
         mat = (float *)snrt_l1_next();
-        perm_vec = (uint32_t *)(mat + elems * elems);
-        y = (float *)(perm_vec + elems);
-        vec = y + elems;
-        result = vec + elems;
-        local_sum = result + elems;
+        perm_vec = (uint32_t *)(mat + N * N);
+        y = (float *)(perm_vec + N);
+        vec = y + N;
+        result = vec + N;
+        local_sum = result + N;
 
-        for (uint32_t i=0; i<elems; i++) {
-            for (uint32_t j=0; j<elems; j++) {
-                mat[i*elems + j] = mat_LU[i*elems + j]; // Copy the generated LU matrix by the 
+        for (uint32_t i=0; i<N; i++) {
+            for (uint32_t j=0; j<N; j++) {
+                mat[i*N + j] = mat_LU[i*N + j]; // Copy the generated LU matrix by the 
                 // python script in the L1 pointer
             }
         }
 
-        for (uint32_t i=0;i<elems;i++){
+        for (uint32_t i=0;i<N;i++){
             perm_vec[i] = pivots[i]; // Copy the perm
             vec[i] = i + 1.0f; // initialize the know vector
             result[i] = 0.0f;

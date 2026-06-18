@@ -8,6 +8,6 @@ APP                 := kmeans_b
 $(APP)_BUILD_DIR    ?= $(SN_ROOT)/sw/benchmarks/ML/$(APP)/build
 SRC_DIR             := $(SN_ROOT)/sw/benchmarks/ML/$(APP)/src
 SRCS                := $(SRC_DIR)/main.c
-$(APP)_INCDIRS   	:= $(SN_ROOT)/sw/benchmarks/ML/$(APP)/build
+$(APP)_INCDIRS   	:= $(SN_ROOT)/sw/benchmarks/ML/$(APP)/data
 
 include $(SN_ROOT)/sw/kernels/common.mk

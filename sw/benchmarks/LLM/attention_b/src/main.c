@@ -36,8 +36,10 @@ int main(void) {
     snrt_mcycle();
 
     if (snrt_is_compute_core()) {
-        attention( out_tcdm, preatt_tcdm, att_tcdm,
-            inp_tcdm, (uint32_t)B, (uint32_t)T, (uint32_t)C, (uint32_t)NH);
+        for(uint32_t i=0; i<4; i++){
+            attention( out_tcdm, preatt_tcdm, att_tcdm,
+                inp_tcdm, (uint32_t)B, (uint32_t)T, (uint32_t)C, (uint32_t)NH);
+        }
     }
 
     snrt_cluster_hw_barrier();
