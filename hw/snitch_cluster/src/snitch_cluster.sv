@@ -220,6 +220,7 @@ module snitch_cluster
   /// Optional fixed cluster alias region.
   parameter bit          AliasRegionEnable  = 1'b0,
   parameter logic [PhysicalAddrWidth-1:0] AliasRegionBase    = '0,
+  parameter snitch_cluster_pkg::addr_t ClusterBaseAddr = snitch_cluster_pkg::CfgClusterBaseAddr,
   /// Instantiate internal bootrom.
   parameter bit          IntBootromEnable   = 1'b1
 ) (
@@ -250,7 +251,7 @@ module snitch_cluster
   input  logic [9:0]                              hart_base_id_i,
   /// Base address of cluster. TCDM and cluster peripheral location are derived from
   /// it. This signal is pseudo-static.
-  input  logic [PhysicalAddrWidth-1:0]            cluster_base_addr_i,
+  // input  logic [PhysicalAddrWidth-1:0]            cluster_base_addr_i,
   /// Configuration inputs for the memory cuts used in implementation.
   /// These signals are pseudo-static.
   input  sram_cfgs_t                              sram_cfgs_i,
@@ -522,9 +523,9 @@ module snitch_cluster
   // ---------------------------
   // Cluster-internal Addressing
   // ---------------------------
-  // Calculate start and end address of TCDM based on the `cluster_base_addr_i`.
+  // Calculate start and end address of TCDM based on the `ClusterBaseAddr`.
   addr_t tcdm_start_address, tcdm_end_address;
-  assign tcdm_start_address = (cluster_base_addr_i & TCDMMask);
+  assign tcdm_start_address = (ClusterBaseAddr & TCDMMask);
   assign tcdm_end_address   = (tcdm_start_address + TCDMSizeNapotRounded) & TCDMMask;
 
   addr_t bootrom_start_address, bootrom_end_address;
@@ -1574,7 +1575,7 @@ module snitch_cluster
   `ASSERT_INIT(CheckHyperBankFactor, (NrBanks % NrHyperBanks) == 0);
   `ASSERT_INIT(CheckSuperBankInHyperBank, (BanksPerHyperBank % BanksPerSuperBank) == 0);
   // Check that the cluster base address aligns to the TCDMSizeNapotRounded.
-  `ASSERT(ClusterBaseAddrAlign, ((TCDMSizeNapotRounded - 1) & cluster_base_addr_i) == 0)
+  `ASSERT(ClusterBaseAddrAlign, ((TCDMSizeNapotRounded - 1) & ClusterBaseAddr) == 0)
   // Check that the cluster alias address, if enabled, aligns to the TCDMSizeNapotRounded.
   `ASSERT_INIT(AliasRegionAddrAlign,
     ~AliasRegionEnable || ((TCDMSizeNapotRounded - 1) & AliasRegionBase) == 0)

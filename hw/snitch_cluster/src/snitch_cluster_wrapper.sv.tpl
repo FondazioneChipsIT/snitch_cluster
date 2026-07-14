@@ -170,7 +170,12 @@ module ${cfg['cluster']['name']}_wrapper (
     .CaqTagWidth (${int(cfg['cluster']['caq_tag_width'])}),
     .DebugSupport (${int(cfg['cluster']['enable_debug'])}),
     .AliasRegionEnable (${int(cfg['cluster']['alias_region_enable'])}),
-    .AliasRegionBase (${int(cfg['cluster']['alias_region_base'])})
+    .AliasRegionBase (${int(cfg['cluster']['alias_region_base'])}),
+    % if cfg['cluster']['cluster_base_expose']:
+    .ClusterBaseAddr (),
+    % else:
+    .ClusterBaseAddr (snitch_cluster_pkg::CfgClusterBaseAddr)
+    % endif
   ) i_cluster (
     .clk_i,
     .rst_ni,
@@ -189,10 +194,8 @@ module ${cfg['cluster']['name']}_wrapper (
 % endif
 % if cfg['cluster']['cluster_base_expose']:
     .hart_base_id_i,
-    .cluster_base_addr_i,
 % else:
     .hart_base_id_i (snitch_cluster_pkg::CfgBaseHartId),
-    .cluster_base_addr_i (snitch_cluster_pkg::CfgClusterBaseAddr),
 % endif
 % if cfg['cluster']['timing']['iso_crossings']:
     .clk_d2_bypass_i,

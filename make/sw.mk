@@ -73,6 +73,9 @@ SN_BUILD_APPS ?= ON
 
 ifeq ($(SN_BUILD_APPS), ON)
 # Benhmarks
+
+SN_APPS += $(SN_ROOT)/sw/benchmarks/idle
+SN_APPS += $(SN_ROOT)/sw/benchmarks/div
 # DSP kernels
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/DWT
 SN_APPS += $(SN_ROOT)/sw/benchmarks/DSP/FFT

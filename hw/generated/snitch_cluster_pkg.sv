@@ -107,12 +107,12 @@ package snitch_cluster_pkg;
     '{
         PipeRegs: // FMA Block
                   '{
-                    '{  2, // FP32
-                        3, // FP64
-                        1, // FP16
-                        1, // FP8
-                        1, // FP16alt
-                        1  // FP8alt
+                    '{  1, // FP32
+                        2, // FP64
+                        0, // FP16
+                        0, // FP8
+                        0, // FP16alt
+                        0  // FP8alt
                       },
                     '{1, 1, 1, 1, 1, 1},   // DIVSQRT
                     '{1,
@@ -127,12 +127,12 @@ package snitch_cluster_pkg;
                       2,
                       2,
                       2},   // CONV
-                    '{3,
-                      3,
-                      3,
-                      3,
-                      3,
-                      3}    // DOTP
+                    '{2,
+                      2,
+                      2,
+                      2,
+                      2,
+                      2}    // DOTP
                     },
         UnitTypes: '{'{fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
@@ -140,12 +140,12 @@ package snitch_cluster_pkg;
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}, // DIVSQRT
+                    '{fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED}, // DIVSQRT
                     '{fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
@@ -164,17 +164,17 @@ package snitch_cluster_pkg;
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED}},  // DOTP
-        PipeConfig: fpnew_pkg::DISTRIBUTED
+        PipeConfig: fpnew_pkg::BEFORE
     },
     '{
         PipeRegs: // FMA Block
                   '{
-                    '{  2, // FP32
-                        3, // FP64
-                        1, // FP16
-                        1, // FP8
-                        1, // FP16alt
-                        1  // FP8alt
+                    '{  1, // FP32
+                        2, // FP64
+                        0, // FP16
+                        0, // FP8
+                        0, // FP16alt
+                        0  // FP8alt
                       },
                     '{1, 1, 1, 1, 1, 1},   // DIVSQRT
                     '{1,
@@ -189,12 +189,12 @@ package snitch_cluster_pkg;
                       2,
                       2,
                       2},   // CONV
-                    '{3,
-                      3,
-                      3,
-                      3,
-                      3,
-                      3}    // DOTP
+                    '{2,
+                      2,
+                      2,
+                      2,
+                      2,
+                      2}    // DOTP
                     },
         UnitTypes: '{'{fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
@@ -202,12 +202,12 @@ package snitch_cluster_pkg;
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}, // DIVSQRT
+                    '{fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED}, // DIVSQRT
                     '{fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
@@ -226,17 +226,17 @@ package snitch_cluster_pkg;
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED}},  // DOTP
-        PipeConfig: fpnew_pkg::DISTRIBUTED
+        PipeConfig: fpnew_pkg::BEFORE
     },
     '{
         PipeRegs: // FMA Block
                   '{
-                    '{  2, // FP32
-                        3, // FP64
-                        1, // FP16
-                        1, // FP8
-                        1, // FP16alt
-                        1  // FP8alt
+                    '{  1, // FP32
+                        2, // FP64
+                        0, // FP16
+                        0, // FP8
+                        0, // FP16alt
+                        0  // FP8alt
                       },
                     '{1, 1, 1, 1, 1, 1},   // DIVSQRT
                     '{1,
@@ -251,12 +251,12 @@ package snitch_cluster_pkg;
                       2,
                       2,
                       2},   // CONV
-                    '{3,
-                      3,
-                      3,
-                      3,
-                      3,
-                      3}    // DOTP
+                    '{2,
+                      2,
+                      2,
+                      2,
+                      2,
+                      2}    // DOTP
                     },
         UnitTypes: '{'{fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
@@ -264,12 +264,12 @@ package snitch_cluster_pkg;
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}, // DIVSQRT
+                    '{fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED}, // DIVSQRT
                     '{fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
@@ -288,17 +288,17 @@ package snitch_cluster_pkg;
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED}},  // DOTP
-        PipeConfig: fpnew_pkg::DISTRIBUTED
+        PipeConfig: fpnew_pkg::BEFORE
     },
     '{
         PipeRegs: // FMA Block
                   '{
-                    '{  2, // FP32
-                        3, // FP64
-                        1, // FP16
-                        1, // FP8
-                        1, // FP16alt
-                        1  // FP8alt
+                    '{  1, // FP32
+                        2, // FP64
+                        0, // FP16
+                        0, // FP8
+                        0, // FP16alt
+                        0  // FP8alt
                       },
                     '{1, 1, 1, 1, 1, 1},   // DIVSQRT
                     '{1,
@@ -313,12 +313,12 @@ package snitch_cluster_pkg;
                       2,
                       2,
                       2},   // CONV
-                    '{3,
-                      3,
-                      3,
-                      3,
-                      3,
-                      3}    // DOTP
+                    '{2,
+                      2,
+                      2,
+                      2,
+                      2,
+                      2}    // DOTP
                     },
         UnitTypes: '{'{fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
@@ -326,12 +326,12 @@ package snitch_cluster_pkg;
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}, // DIVSQRT
+                    '{fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED}, // DIVSQRT
                     '{fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
@@ -350,17 +350,17 @@ package snitch_cluster_pkg;
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED}},  // DOTP
-        PipeConfig: fpnew_pkg::DISTRIBUTED
+        PipeConfig: fpnew_pkg::BEFORE
     },
     '{
         PipeRegs: // FMA Block
                   '{
-                    '{  2, // FP32
-                        3, // FP64
-                        1, // FP16
-                        1, // FP8
-                        1, // FP16alt
-                        1  // FP8alt
+                    '{  1, // FP32
+                        2, // FP64
+                        0, // FP16
+                        0, // FP8
+                        0, // FP16alt
+                        0  // FP8alt
                       },
                     '{1, 1, 1, 1, 1, 1},   // DIVSQRT
                     '{1,
@@ -375,12 +375,12 @@ package snitch_cluster_pkg;
                       2,
                       2,
                       2},   // CONV
-                    '{3,
-                      3,
-                      3,
-                      3,
-                      3,
-                      3}    // DOTP
+                    '{2,
+                      2,
+                      2,
+                      2,
+                      2,
+                      2}    // DOTP
                     },
         UnitTypes: '{'{fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
@@ -388,12 +388,12 @@ package snitch_cluster_pkg;
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}, // DIVSQRT
+                    '{fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED}, // DIVSQRT
                     '{fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
@@ -412,17 +412,17 @@ package snitch_cluster_pkg;
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED}},  // DOTP
-        PipeConfig: fpnew_pkg::DISTRIBUTED
+        PipeConfig: fpnew_pkg::BEFORE
     },
     '{
         PipeRegs: // FMA Block
                   '{
-                    '{  2, // FP32
-                        3, // FP64
-                        1, // FP16
-                        1, // FP8
-                        1, // FP16alt
-                        1  // FP8alt
+                    '{  1, // FP32
+                        2, // FP64
+                        0, // FP16
+                        0, // FP8
+                        0, // FP16alt
+                        0  // FP8alt
                       },
                     '{1, 1, 1, 1, 1, 1},   // DIVSQRT
                     '{1,
@@ -437,12 +437,12 @@ package snitch_cluster_pkg;
                       2,
                       2,
                       2},   // CONV
-                    '{3,
-                      3,
-                      3,
-                      3,
-                      3,
-                      3}    // DOTP
+                    '{2,
+                      2,
+                      2,
+                      2,
+                      2,
+                      2}    // DOTP
                     },
         UnitTypes: '{'{fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
@@ -450,12 +450,12 @@ package snitch_cluster_pkg;
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}, // DIVSQRT
+                    '{fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED}, // DIVSQRT
                     '{fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
@@ -474,17 +474,17 @@ package snitch_cluster_pkg;
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED}},  // DOTP
-        PipeConfig: fpnew_pkg::DISTRIBUTED
+        PipeConfig: fpnew_pkg::BEFORE
     },
     '{
         PipeRegs: // FMA Block
                   '{
-                    '{  2, // FP32
-                        3, // FP64
-                        1, // FP16
-                        1, // FP8
-                        1, // FP16alt
-                        1  // FP8alt
+                    '{  1, // FP32
+                        2, // FP64
+                        0, // FP16
+                        0, // FP8
+                        0, // FP16alt
+                        0  // FP8alt
                       },
                     '{1, 1, 1, 1, 1, 1},   // DIVSQRT
                     '{1,
@@ -499,12 +499,12 @@ package snitch_cluster_pkg;
                       2,
                       2,
                       2},   // CONV
-                    '{3,
-                      3,
-                      3,
-                      3,
-                      3,
-                      3}    // DOTP
+                    '{2,
+                      2,
+                      2,
+                      2,
+                      2,
+                      2}    // DOTP
                     },
         UnitTypes: '{'{fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
@@ -512,12 +512,12 @@ package snitch_cluster_pkg;
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}, // DIVSQRT
+                    '{fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED}, // DIVSQRT
                     '{fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
@@ -536,17 +536,17 @@ package snitch_cluster_pkg;
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED}},  // DOTP
-        PipeConfig: fpnew_pkg::DISTRIBUTED
+        PipeConfig: fpnew_pkg::BEFORE
     },
     '{
         PipeRegs: // FMA Block
                   '{
-                    '{  2, // FP32
-                        3, // FP64
-                        1, // FP16
-                        1, // FP8
-                        1, // FP16alt
-                        1  // FP8alt
+                    '{  1, // FP32
+                        2, // FP64
+                        0, // FP16
+                        0, // FP8
+                        0, // FP16alt
+                        0  // FP8alt
                       },
                     '{1, 1, 1, 1, 1, 1},   // DIVSQRT
                     '{1,
@@ -561,12 +561,12 @@ package snitch_cluster_pkg;
                       2,
                       2,
                       2},   // CONV
-                    '{3,
-                      3,
-                      3,
-                      3,
-                      3,
-                      3}    // DOTP
+                    '{2,
+                      2,
+                      2,
+                      2,
+                      2,
+                      2}    // DOTP
                     },
         UnitTypes: '{'{fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
@@ -574,12 +574,12 @@ package snitch_cluster_pkg;
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED},  // FMA
-                    '{fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED,
-                        fpnew_pkg::MERGED}, // DIVSQRT
+                    '{fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED,
+                        fpnew_pkg::DISABLED}, // DIVSQRT
                     '{fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
                         fpnew_pkg::PARALLEL,
@@ -598,17 +598,17 @@ package snitch_cluster_pkg;
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED,
                         fpnew_pkg::MERGED}},  // DOTP
-        PipeConfig: fpnew_pkg::DISTRIBUTED
+        PipeConfig: fpnew_pkg::BEFORE
     },
     '{
         PipeRegs: // FMA Block
                   '{
-                    '{  2, // FP32
-                        3, // FP64
-                        1, // FP16
-                        1, // FP8
-                        1, // FP16alt
-                        1  // FP8alt
+                    '{  1, // FP32
+                        2, // FP64
+                        0, // FP16
+                        0, // FP8
+                        0, // FP16alt
+                        0  // FP8alt
                       },
                     '{1, 1, 1, 1, 1, 1},   // DIVSQRT
                     '{1,
@@ -623,12 +623,12 @@ package snitch_cluster_pkg;
                       2,
                       2,
                       2},   // CONV
-                    '{3,
-                      3,
-                      3,
-                      3,
-                      3,
-                      3}    // DOTP
+                    '{2,
+                      2,
+                      2,
+                      2,
+                      2,
+                      2}    // DOTP
                     },
         UnitTypes: '{'{fpnew_pkg::MERGED,
                        fpnew_pkg::MERGED,
@@ -660,7 +660,7 @@ package snitch_cluster_pkg;
                         fpnew_pkg::DISABLED,
                         fpnew_pkg::DISABLED,
                         fpnew_pkg::DISABLED}}, // DOTP
-        PipeConfig: fpnew_pkg::DISTRIBUTED
+        PipeConfig: fpnew_pkg::BEFORE
     }
   };
 
