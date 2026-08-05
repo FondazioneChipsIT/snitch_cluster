@@ -14,7 +14,9 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
     // row after row)
     snrt_ssr_loop_1d(SNRT_SSR_DM1, k, n*sizeof(float)); 
 
-    // we cannot write C with ssrs as we need to read it, SSRs are unidirectional
+    // Write the dst matrix with a n stride-> access a column (in memory the matrix is put
+    // row after row), only 1 element of the column per time, total chunK_per_core*n elements
+    snrt_ssr_loop_1d(SNRT_SSR_DM2, 1, n*sizeof(float)); 
 
     /* Load zero into the accumulators */
     asm volatile(
@@ -24,6 +26,7 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
     "flw ft6, 0(%[zero])\n"
     "flw ft7, 0(%[alpha])\n"
     "flw ft8, 0(%[beta])\n"
+    "flw ft11, 0(%[zero])\n"
     :
     : [zero] "r"(&zero), [alpha] "r"(&alpha), [beta] "r"(&beta)
     : "ft3", "ft4", "ft5", "ft6", "ft7", "ft8", "memory");
@@ -39,6 +42,8 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
         for(uint32_t rows = 0; rows < m; rows++){
             // As for the column the read is easy as it is only offset+rows (stored as rows)
             snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, mat_b + cols + offset);
+            // Write stream for dst, colum indexed by offset + rows*elems (row 0,1,2 etc...)
+            snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, mat_c + cols + offset + rows*(size_t)n);
 
             float *ptr = mat_c + cols + offset + rows*n; // Pointer to the output element
             // Explicit assembly to avoid letting the compiler
@@ -64,7 +69,7 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
 
                 "fmadd.s ft10, ft10, ft7, ft9\n" /* Add beta * c_val, ft10 = alpha *A*B + beta * C_val */
 
-                "fsw ft10, 0(%[dst])\n" /* Store result in dst */
+                "fadd.s ft2, ft11, ft10\n" /* Store result in dst */
 
                 "fsub.s ft3, ft3, ft3\n" // Reset accs
                 "fsub.s ft4, ft4, ft4\n"
@@ -72,7 +77,7 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
                 "fsub.s ft6, ft6, ft6\n"
                 : 
                 : [n_frep] "r"(k/4 - 1), [dst] "r"(ptr)
-                : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "ft8", "ft9", "ft10", "memory");
+                : "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "ft8", "ft9", "ft10", "ft11", "memory");
         }    
 
     }
