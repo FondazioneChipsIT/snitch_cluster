@@ -148,7 +148,8 @@ module snitch_cluster_wrapper (
     .CaqTagWidth (16),
     .DebugSupport (0),
     .AliasRegionEnable (1),
-    .AliasRegionBase (402653184)
+    .AliasRegionBase (402653184),
+    .ClusterBaseAddr (snitch_cluster_pkg::CfgClusterBaseAddr)
   ) i_cluster (
     .clk_i,
     .rst_ni,
@@ -158,7 +159,6 @@ module snitch_cluster_wrapper (
     .msip_i,
     .mxip_i ('0),
     .hart_base_id_i (snitch_cluster_pkg::CfgBaseHartId),
-    .cluster_base_addr_i (snitch_cluster_pkg::CfgClusterBaseAddr),
     .clk_d2_bypass_i (1'b0),
     .sram_cfgs_i (sram_cfgs_i),
     .narrow_ext_req_o (narrow_ext_req_o),

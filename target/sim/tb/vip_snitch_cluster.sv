@@ -111,6 +111,16 @@ module vip_snitch_cluster
     narrow_in_req = '0;
   end
 
+  // Releasing a request payload with a blocking assignment in the same time step as the
+  // capturing clock edge is a race: the order of this process and the DUT's capture flop
+  // within the time step is undefined, so the flop may observe the new (cleared) value.
+  // RTL happens to resolve it in the DUT's favour; the gate-level netlist does not, because
+  // synthesis puts an integrated clock gate in front of that flop - it is no longer
+  // sensitive to clk, so its edge lands in a later evaluation delta than this process,
+  // after the payload is gone. Hold the payload past the edge so the capture is
+  // unambiguous. See nonfree/gf12/questasim_postlayout/README.MD.
+  localparam realtime StimHold = 1ps;
+
   // Simple read/write tasks that are compatible with verilator.
   task automatic narrow_write(
     input logic [AddrWidth-1:0] addr,
@@ -121,6 +131,7 @@ module vip_snitch_cluster
     narrow_in_req.aw.size = axi_pkg::size_t'($clog2(NarrowDataWidth/8));
     narrow_in_req.aw_valid = 1'b1;
     do @(posedge clk); while (!narrow_in_resp.aw_ready);
+    #StimHold;
     narrow_in_req.aw_valid = 1'b0;
     narrow_in_req.aw = '0;
     narrow_in_req.w.data = data;
@@ -128,10 +139,12 @@ module vip_snitch_cluster
     narrow_in_req.w.last = 1'b1;
     narrow_in_req.w_valid = 1'b1;
     do @(posedge clk); while (!narrow_in_resp.w_ready);
+    #StimHold;
     narrow_in_req.w_valid = 1'b0;
     narrow_in_req.w = '0;
     narrow_in_req.b_ready = 1'b1;
     do @(posedge clk); while (!narrow_in_resp.b_valid);
+    #StimHold;
     resp = narrow_in_resp.b.resp;
     narrow_in_req.b_ready = 1'b0;
   endtask
@@ -145,10 +158,12 @@ module vip_snitch_cluster
     narrow_in_req.ar.size = axi_pkg::size_t'($clog2(NarrowDataWidth/8));
     narrow_in_req.ar_valid = 1'b1;
     do @(posedge clk); while (!narrow_in_resp.ar_ready);
+    #StimHold;
     narrow_in_req.ar_valid = 1'b0;
     narrow_in_req.ar = '0;
     narrow_in_req.r_ready = 1'b1;
     do @(posedge clk); while (!narrow_in_resp.r_valid);
+    #StimHold;
     data = narrow_in_resp.r.data;
     resp = narrow_in_resp.r.resp;
     narrow_in_req.r_ready = 1'b0;
