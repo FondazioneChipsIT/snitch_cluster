@@ -1,10 +1,18 @@
 #include <math.h>
 #include "snrt.h"
 
-snrt_barrier_t barr;
+// The barrier must NOT be a plain global: globals are linked into L3 (the
+// linker script only has the DRAM region), so every snrt_partial_barrier would
+// spin on a DRAM address at ~60 cycles per access. It is allocated in TCDM by
+// the DM core in main instead, and this global only holds the pointer.
+snrt_barrier_t *barr;
 
 void cholesky_opt(uint32_t core_idx, uint32_t ncores,
                    float *src, float *dst, uint32_t dim){
+
+    // Local copy: otherwise the global pointer is re-read from DRAM after
+    // every barrier call (the call writes memory, so it cannot be cached)
+    snrt_barrier_t *bar_p = barr;
 
     for (uint32_t m = 0; m < dim; m++) {
 
@@ -50,7 +58,7 @@ void cholesky_opt(uint32_t core_idx, uint32_t ncores,
         }
 
         // Other cores wait for the diagonal element to be computed before proceeding
-        snrt_partial_barrier(&barr, 8);
+        snrt_partial_barrier(bar_p, 8);
 
         float lmm = dst[m*dim + m];
         float inv_lmm = 1.0f / lmm;
@@ -110,7 +118,7 @@ void cholesky_opt(uint32_t core_idx, uint32_t ncores,
         }
 
         // Barrier to avoid that core 0 starts to compute the next diagonal element before all the elements of the current column are computed
-        snrt_partial_barrier(&barr, 8);
+        snrt_partial_barrier(bar_p, 8);
     }
     snrt_fpu_fence();
     return;

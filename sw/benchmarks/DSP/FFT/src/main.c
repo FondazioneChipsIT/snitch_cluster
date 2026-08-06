@@ -22,6 +22,13 @@ int main() {
 
 	// Copy data in TCDM
     if (snrt_is_dm_core()) {
+        // Barrier in TCDM: as a global it would be linked into DRAM and every
+        // snrt_partial_barrier would spin on it at ~60 cycles per access.
+        // Allocated first, so the layout below is placed after it.
+        barr = (snrt_barrier_t *)snrt_l1_alloc(sizeof(snrt_barrier_t));
+        barr->cnt = 0;
+        barr->iteration = 0;
+
 		// Generate addresses in L1
 		local_x  = (float *) snrt_l1_next();
 		local_tw = local_x + FFT_N*2;

@@ -48,20 +48,21 @@ void conv3x3_opt(uint32_t core_idx, uint32_t chunk_per_core, uint32_t offset,
         // Y writeback
         snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, y + offset*(FM_ROWS-2));
 
-        asm volatile(  
-        "frep.o %[n_frep], 14, 0, 0 \n" // Repeat chunk times
-        "fsub.s ft3, ft3, ft3\n"   // acc = 0
-        "fsub.s ft4, ft4, ft4 \n"  // acc2= 0
-        "fsub.s ft5, ft5, ft5 \n"  // acc3= 0
+        // The three fsub that reset the accumulators are not needed: the first
+        // three taps can use fmul instead of fmadd, which both initialises the
+        // accumulator and does useful work. 11 instructions per output pixel
+        // instead of 14, for the same 9 MACs.
+        asm volatile(
+        "frep.o %[n_frep], 11, 0, 0 \n" // Repeat chunk times
+        "fmul.s ft3, ft0, ft1\n"       // acc  = tap 0 (also resets the acc)
+        "fmul.s ft4, ft0, ft1\n"       // acc2 = tap 1
+        "fmul.s ft5, ft0, ft1\n"       // acc3 = tap 2
         "fmadd.s ft3, ft0, ft1, ft3\n" // 9 time like the filter size, need to change for CONV5 or 7
         "fmadd.s ft4, ft0, ft1, ft4\n"
         "fmadd.s ft5, ft0, ft1, ft5\n"
         "fmadd.s ft3, ft0, ft1, ft3\n"
         "fmadd.s ft4, ft0, ft1, ft4\n"
         "fmadd.s ft5, ft0, ft1, ft5\n"
-        "fmadd.s ft3, ft0, ft1, ft3\n"
-        "fmadd.s ft4, ft0, ft1, ft4\n"
-        "fmadd.s ft5, ft0, ft1, ft5\n" 
         "fadd.s ft3, ft3, ft4\n"     // storeback
         "fadd.s ft2, ft3, ft5\n"     // storeback
         :

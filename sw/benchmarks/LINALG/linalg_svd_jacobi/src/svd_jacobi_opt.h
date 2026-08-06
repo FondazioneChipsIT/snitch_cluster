@@ -4,14 +4,26 @@
 uint32_t MAX_ITER = 1000;
 float EPSILON = 1e-4f;
 
-snrt_barrier_t   barr;
-volatile float   max_offdiag;
-volatile float max_scale_global;
-volatile float local_scale[8];
+// The barrier must NOT be a plain global: globals are linked into L3 (the
+// linker script only has the DRAM region), so every snrt_partial_barrier would
+// spin on a DRAM address at ~60 cycles per access. It is allocated in TCDM by
+// the DM core in main instead, and this global only holds the pointer.
+snrt_barrier_t *barr;
+// Same reason as the barrier: these are written by one core and read by the
+// others across a barrier. As plain globals they live in DRAM, and a store to
+// DRAM is posted, so it can still be in flight when the barrier releases and
+// the reader may see the previous value. They are allocated in TCDM in main,
+// next to local_max, which was already handled that way.
+volatile float  *max_offdiag;
+volatile float  *max_scale_global;
+volatile float  *local_scale;   // [8]
 
 
 void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S,
                     uint32_t dim_M, uint32_t dim_N) {
+    // Local copy: otherwise the global pointer is re-read from DRAM after
+    // every barrier call (the call writes memory, so it cannot be cached)
+    snrt_barrier_t *bar_p = barr;
     const float zero = 0.0f;
     const float one  = 1.0f;
     const float two  = 2.0f;
@@ -109,7 +121,7 @@ void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S,
             } /* fine ciclo coppie */
 
             /* ── Barrier + riduzione del massimo off-diagonale ──────────── */
-            snrt_partial_barrier(&barr, 8);
+            snrt_partial_barrier(bar_p, 8);
 
             if (core_idx == 0) {
                 float mx = local_max[0];
@@ -118,13 +130,13 @@ void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S,
                     if (local_max[cid] > mx) mx = local_max[cid];
                     if (local_scale[cid] > sc) sc = local_scale[cid];
                 }
-                max_scale_global = sc;
-                max_offdiag = mx;
+                *max_scale_global = sc;
+                *max_offdiag = mx;
             }
 
-            snrt_partial_barrier(&barr, 8);
+            snrt_partial_barrier(bar_p, 8);
 
-            if (max_offdiag <= EPSILON * max_scale_global)
+            if (*max_offdiag <= EPSILON * (*max_scale_global))
                 done = true;
 
         } /* fine round */
@@ -146,7 +158,7 @@ void svd_jacobi_opt(float *mat, float *mat_V, float *vec_S,
         vec_S[i] = (norm_sq > zero) ? sqrtf(norm_sq) : zero;
     }
 
-    snrt_partial_barrier(&barr, 8);
+    snrt_partial_barrier(bar_p, 8);
     snrt_fpu_fence();
     return;
 }

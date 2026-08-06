@@ -47,6 +47,10 @@ static inline void swap_rows_simple(float *mat, uint32_t n, uint32_t r1, uint32_
 void lu_decomp_naive(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, uint64_t *end_cycle, 
                             float *mat, int *perm) {
 
+    // Local copy: otherwise the global pointer is re-read from DRAM after
+    // every barrier call (the call writes memory, so it cannot be cached)
+    snrt_barrier_t *bar_p = barr;
+
     for (uint32_t k = 0; k < elems; k++) {
 
         if(core_idx == 0){
@@ -79,7 +83,7 @@ void lu_decomp_naive(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, 
             }
         }
     
-        snrt_partial_barrier(&barr, 8);
+        snrt_partial_barrier(bar_p, 8);
         float pivot = mat[k * elems + k];
         float p_inv = 1.0f / pivot;
 
@@ -107,7 +111,7 @@ void lu_decomp_naive(uint32_t core_idx ,uint32_t ncores, uint64_t *start_cycle, 
         }
     
 
-        snrt_partial_barrier(&barr, 8);
+        snrt_partial_barrier(bar_p, 8);
     }
     snrt_fpu_fence();
     return;

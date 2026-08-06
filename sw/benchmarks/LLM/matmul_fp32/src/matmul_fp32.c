@@ -6,7 +6,7 @@
 
 /* Print first/last elements  */
 // avoid, giant matrix sizes, works pefectly
-uint32_t CHECK_RESULTS = 0;
+uint32_t CHECK_RESULTS = 1;
 
 int main() {
     uint32_t core_idx = snrt_cluster_core_idx();
@@ -51,7 +51,10 @@ int main() {
     snrt_cluster_hw_barrier();
     snrt_mcycle();
     uint32_t err = 0;
-    float eps = 1e-5f;
+    // 5e-5 like the gemm benchmark, which does the same math: a dot product of
+    // K = 64 terms accumulates ~1e-5 of rounding in fp32, so 1e-5 was flagging
+    // pure rounding (the original kernel failed it too, with 2 elements).
+    float eps = 5e-5f;
 
     if (CHECK_RESULTS == 1 && core_idx == 0) {
         asm("nop \n");

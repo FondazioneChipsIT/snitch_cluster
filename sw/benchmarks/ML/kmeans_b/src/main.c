@@ -17,7 +17,11 @@ int main() {
     uint32_t end_idx   = start_idx + chunk + (core_idx < remainder ? 1 : 0);
 
     // ── Layout TCDM ──────────────────────────────────────────────────────────
-    float*    local_samples   = (float*)snrt_l1_next();
+    // Barrier in TCDM (see the note in kmeans_new.h): here the layout is
+    // computed by every core, so the barrier is simply the first object of it
+    // and only the DM core initialises it below.
+    snrt_barrier_t* l1_barr   = (snrt_barrier_t*)snrt_l1_next();
+    float*    local_samples   = (float*)(l1_barr + 1);
     float*    local_delta = local_samples + n_samples * n_features;
     float*    local_centroids = local_delta   + n_cores;
     float*    partial_cents   = local_centroids + n_clusters * n_features;
@@ -32,6 +36,10 @@ int main() {
     }
     // ── DMA ──────────────────────────────────────────────────────────────────
     if (snrt_is_dm_core()) {
+        barr = l1_barr;
+        barr->cnt = 0;
+        barr->iteration = 0;
+
         snrt_dma_start_1d(local_samples,   (float*)samples,
                           n_samples  * n_features * sizeof(float));
         snrt_dma_start_1d(local_centroids, (float*)centroids,

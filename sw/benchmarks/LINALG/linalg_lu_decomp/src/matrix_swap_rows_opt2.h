@@ -18,7 +18,7 @@ void matrix_swap_rows_opt2(uint32_t chunk_per_core, uint32_t offset,
     asm volatile(
         "flw ft4, 0(%[zero])\n"
         :                   // Outputs
-        : [zero] "r"(zero)   // Inputs 
+        : [zero] "r"(&zero)  // Inputs 
         : "ft4");           // Clobber list
     
     snrt_ssr_enable();
@@ -32,6 +32,7 @@ void matrix_swap_rows_opt2(uint32_t chunk_per_core, uint32_t offset,
 
     // Disable SSRs
     snrt_ssr_disable();
+    snrt_fpu_fence();  // il buffer appena scritto viene riletto qui sotto
 
     snrt_ssr_loop_1d(SNRT_SSR_DM0, chunk_per_core, sizeof(float));
     snrt_ssr_loop_1d(SNRT_SSR_DM1, chunk_per_core, sizeof(float));
@@ -50,6 +51,7 @@ void matrix_swap_rows_opt2(uint32_t chunk_per_core, uint32_t offset,
 
     // Disable SSRs
     snrt_ssr_disable();
+    snrt_fpu_fence();  // il buffer appena scritto viene riletto qui sotto
 
 
     snrt_ssr_loop_1d(SNRT_SSR_DM0, chunk_per_core, sizeof(float));
@@ -69,6 +71,7 @@ void matrix_swap_rows_opt2(uint32_t chunk_per_core, uint32_t offset,
 
     // Disable SSRs
     snrt_ssr_disable();
+    snrt_fpu_fence();  // il buffer appena scritto viene riletto qui sotto
 
 
     snrt_ssr_loop_1d(SNRT_SSR_DM0, chunk_per_core, sizeof(float));
@@ -88,6 +91,7 @@ void matrix_swap_rows_opt2(uint32_t chunk_per_core, uint32_t offset,
 
     // Disable SSRs
     snrt_ssr_disable();
+    snrt_fpu_fence();  // il buffer appena scritto viene riletto qui sotto
 
 
     // Fence for FPU syncronization

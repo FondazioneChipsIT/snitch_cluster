@@ -6,7 +6,17 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
                     uint32_t m, uint32_t n, uint32_t k){
 
     float zero = 0.0f; // Zero register
-    
+
+    // Columns are assigned to the cores INTERLEAVED (core c takes the columns
+    // c, c+ncores, c+2*ncores, ...) instead of in one contiguous block.
+    // Reason: a column of mat_b is read with stride n*sizeof(float) = 256 B,
+    // and the TCDM has 32 banks of 4 B, so a whole column lives in the single
+    // bank (col % 32). With the contiguous mapping the cores 0-4, 1-5, 2-6 and
+    // 3-7 end up on the same bank for the entire kernel and every access is
+    // serialized 2:1. Interleaving gives every core a different bank.
+    uint32_t core_idx = snrt_cluster_core_idx();
+    uint32_t ncores   = snrt_cluster_compute_core_num();
+
     // Read the mat_a matrix with a 1 stride-> access a row
     snrt_ssr_loop_1d(SNRT_SSR_DM0, m*k, sizeof(float));
 
@@ -35,17 +45,20 @@ void gemm_fp32(uint32_t chunk_per_core, uint32_t offset,
 
     // Columns of mat_b, chunk_per_core times
     for(uint32_t cols = 0; cols < chunk_per_core; cols++){
+        // Interleaved column owned by this core (see the note above)
+        uint32_t col = core_idx + cols * ncores;
+
         // All rows of mat_a, all for each column of mat b
         // Read all rows of mat_a, one at a time, with stride 1, so we get a row of mat_a in each iteration
         snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D, mat_a + 0);
-        
-        for(uint32_t rows = 0; rows < m; rows++){
-            // As for the column the read is easy as it is only offset+rows (stored as rows)
-            snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, mat_b + cols + offset);
-            // Write stream for dst, colum indexed by offset + rows*elems (row 0,1,2 etc...)
-            snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, mat_c + cols + offset + rows*(size_t)n);
 
-            float *ptr = mat_c + cols + offset + rows*n; // Pointer to the output element
+        for(uint32_t rows = 0; rows < m; rows++){
+            // As for the column the read is easy as it is only col (stored as rows)
+            snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D, mat_b + col);
+            // Write stream for dst, colum indexed by col + rows*elems (row 0,1,2 etc...)
+            snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D, mat_c + col + rows*(size_t)n);
+
+            float *ptr = mat_c + col + rows*n; // Pointer to the output element
             // Explicit assembly to avoid letting the compiler
             // use ft0 (will result in a deadlock as the 
             // SSRs are read before the computation)

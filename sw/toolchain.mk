@@ -23,7 +23,12 @@ SN_RISCV_CFLAGS := -mcpu=snitch
 SN_RISCV_CFLAGS += -menable-experimental-extensions
 SN_RISCV_CFLAGS += --target=riscv32-unknown-elf
 # SN_RISCV_CFLAGS += -march=rv32imaf_xdma_xssr
-SN_RISCV_CFLAGS += -mabi=ilp32d	
+# ilp32f, non ilp32d: questo cluster ha RVD = 0 quindi FLEN = 32 (vedi la formula
+# di FLEN in hw/snitch_cluster/src/snitch_cc.sv). Con ilp32d il compilatore crede
+# che i registri FP callee-saved siano a 64 bit e li salva con fsd, che qui e'
+# istruzione illegale e trappa nel prologo. memset e __udivdi3 arrivano da
+# sw/runtime/src/abi_compat.c perche' le librerie di sistema sono solo ilp32d.
+SN_RISCV_CFLAGS += -mabi=ilp32f
 SN_RISCV_CFLAGS += -mcmodel=medany
 #SN_RISCV_CFLAGS += -mno-fdiv
 SN_RISCV_CFLAGS += -fno-builtin-printf

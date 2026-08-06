@@ -15,10 +15,22 @@ int main() {
 
     /* Allocate on DM core*/
     if (snrt_is_dm_core()) {
+        // Barrier in TCDM: as a global it would be linked into DRAM and every
+        // snrt_partial_barrier would spin on it at ~60 cycles per access.
+        // Allocated first, so the layout below is placed after it.
+        barr = (snrt_barrier_t *)snrt_l1_alloc(sizeof(snrt_barrier_t));
+        barr->cnt = 0;
+        barr->iteration = 0;
+
         mat = (float *)snrt_l1_next();
         mat_V = mat + tot_elems;
         vec_S = mat_V + N*N;
         local_max = vec_S + M;
+        // Shared across cores through a barrier, so they must be in TCDM
+        // together with it (see svd_jacobi_opt.h)
+        local_scale      = (volatile float *)(local_max + ncores);
+        max_offdiag      = (volatile float *)(local_max + 2*ncores);
+        max_scale_global = (volatile float *)(local_max + 2*ncores + 1);
 
         float zero[ncores];
         for (uint32_t i = 0; i < ncores; i++) {

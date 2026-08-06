@@ -36,7 +36,11 @@ float euclidean_distance(uint32_t n_features, float* p1, float* p2) {
     return sum;
 }
 
-snrt_barrier_t barr;
+// The barrier must NOT be a plain global: globals are linked into L3 (the
+// linker script only has the DRAM region), so every snrt_partial_barrier would
+// spin on a DRAM address at ~60 cycles per access. It is allocated in TCDM by
+// the DM core in main instead, and this global only holds the pointer.
+snrt_barrier_t *barr;
 
 void kmeans_iteration(
     uint32_t  start_idx,   
@@ -58,9 +62,13 @@ void kmeans_iteration(
     uint32_t core_id = snrt_cluster_core_idx();
     uint32_t num_cores = snrt_cluster_compute_core_num();
     
+    // Local copy: otherwise the global pointer is re-read from DRAM after
+    // every barrier call (the call writes memory, so it cannot be cached)
+    snrt_barrier_t *bar_p = barr;
+
     uint32_t iter = 0;
 
-    snrt_partial_barrier(&barr, 8);
+    snrt_partial_barrier(bar_p, 8);
 
     // Calcolo blocchi clusters (come Codice 2)
     const uint32_t blockSize2 = (n_clusters + num_cores - 1) / num_cores;
@@ -104,7 +112,7 @@ void kmeans_iteration(
                 local_newClusters[index * n_features + j] += samp[j];
         }
 
-        snrt_partial_barrier(&barr, 8); // pi_cl_team_barrier() 1
+        snrt_partial_barrier(bar_p, 8); // pi_cl_team_barrier() 1
 
         if (core_id == 0)
         {
@@ -136,7 +144,7 @@ void kmeans_iteration(
             }
         }
 
-        snrt_partial_barrier(&barr, 8);
+        snrt_partial_barrier(bar_p, 8);
 
        
         if (core_id == 0)
@@ -161,7 +169,7 @@ void kmeans_iteration(
             iter++;
         }
 
-        snrt_partial_barrier(&barr, 8); 
+        snrt_partial_barrier(bar_p, 8); 
 
     } while (local_delta[core_id] > threshold && iter < max_iter); 
 

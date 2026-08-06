@@ -14,6 +14,12 @@ int main() {
 
     /* Allocate on DM core*/
     if (snrt_is_dm_core()) {
+        // Barrier in TCDM (see the note in ch_decomp_opt.h). Allocated before
+        // the layout below, so snrt_l1_next() returns memory placed after it.
+        barr = (snrt_barrier_t *)snrt_l1_alloc(sizeof(snrt_barrier_t));
+        barr->cnt = 0;
+        barr->iteration = 0;
+
         mat = (float *)snrt_l1_next();
         dst = mat + tot_elems;
 

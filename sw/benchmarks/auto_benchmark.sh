@@ -6,7 +6,7 @@ set -euo pipefail
 
 RESULTS_DIR="sw/benchmarks/results"
 mkdir -p "${RESULTS_DIR}"
-source chips-it-setup.sh
+source util/chips-it-setup.sh
 
 # Run a compilation to ensure all benchmarks are built before we start running them
 make sw

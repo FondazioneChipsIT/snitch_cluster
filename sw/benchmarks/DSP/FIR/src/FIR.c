@@ -73,5 +73,23 @@ int main(){
     snrt_cluster_hw_barrier(); // Barrier syncronization
     snrt_mcycle();
 
-    return 0;
+    uint32_t err = 0;
+    float eps = 1e-3f;
+
+    if (CHECK_RESULTS == 1 && core_idx == 0) {
+        // Only the samples the cores actually computed: the first
+        // FILTER_LEN-1 outputs are never written
+        uint32_t chunk_per_core = (LEN-FILTER_LEN)/ncores;
+        uint32_t first = FILTER_LEN - 1;
+        uint32_t last  = first + chunk_per_core * ncores;
+
+        for(uint32_t n = first; n < last; n++){
+            if(fabsf(y[n] - golden_y[n]) > eps){
+                err ++;
+            }
+        }
+        printf("Errors: %u\n", err);
+    }
+
+    return err;
 }

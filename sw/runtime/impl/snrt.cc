@@ -9,6 +9,7 @@
 #include "cls.c"
 #include "cluster_interrupts.c"
 #include "dm.c"
+#include "abi_compat.c"
 #include "dma.c"
 #include "eu.c"
 #include "kmp.c"

@@ -2,12 +2,18 @@
    runtime library.
    Luca Colombo, 2026, Chips-IT*/
 
-	// Define a generic barrier
-   snrt_barrier_t barr;
+// The barrier must NOT be a plain global: globals are linked into L3 (the
+// linker script only has the DRAM region), so every snrt_partial_barrier would
+// spin on a DRAM address at ~60 cycles per access. It is allocated in TCDM by
+// the DM core in main instead, and this global only holds the pointer.
+snrt_barrier_t *barr;
 
 static float *fft_inner(uint32_t N, float *x, float *y, float *twiddle) {
 	uint32_t core_id = snrt_cluster_core_idx();
 	uint32_t core_num = snrt_cluster_compute_core_num();
+	// Local copy: otherwise the global pointer is re-read from DRAM after
+	// every barrier call (the call writes memory, so it cannot be cached)
+	snrt_barrier_t *bar_p = barr;
 	float *tmp;
 	
 	snrt_ssr_enable();
@@ -70,7 +76,7 @@ static float *fft_inner(uint32_t N, float *x, float *y, float *twiddle) {
 		y = tmp;
 
 		snrt_fpu_fence();
-		snrt_partial_barrier(&barr, 8);
+		snrt_partial_barrier(bar_p, 8);
 	}
 
 	snrt_ssr_disable();
