@@ -7,6 +7,7 @@
 #define AXPY_N 64
 
 unsigned __attribute__((noinline)) static_schedule(void) {
+#ifdef SNRT_SUPPORTS_SSR
     static double *data_x, *data_y, data_a;
 
     // Allocate AXPY input vectors
@@ -24,26 +25,24 @@ unsigned __attribute__((noinline)) static_schedule(void) {
 #pragma omp parallel firstprivate(data_a, data_x, data_y)
     {
         int nthreads = omp_get_num_threads();
-        // DM, rep, bound, stride, data
-        __builtin_ssr_setup_1d_r(
-            0, 0, AXPY_N / nthreads - 1, sizeof(double),
-            &data_x[AXPY_N / nthreads * omp_get_thread_num()]);
-        __builtin_ssr_setup_1d_r(
-            1, 0, AXPY_N / nthreads - 1, sizeof(double),
-            &data_y[AXPY_N / nthreads * omp_get_thread_num()]);
-        __builtin_ssr_setup_1d_w(
-            2, 0, AXPY_N / nthreads - 1, sizeof(double),
-            &data_y[AXPY_N / nthreads * omp_get_thread_num()]);
-        __builtin_ssr_enable();
+        snrt_ssr_loop_1d(SNRT_SSR_DM0, AXPY_N / nthreads, sizeof(double));
+        snrt_ssr_read(SNRT_SSR_DM0, SNRT_SSR_1D,
+                      &data_x[AXPY_N / nthreads * omp_get_thread_num()]);
+        snrt_ssr_loop_1d(SNRT_SSR_DM1, AXPY_N / nthreads, sizeof(double));
+        snrt_ssr_read(SNRT_SSR_DM1, SNRT_SSR_1D,
+                      &data_y[AXPY_N / nthreads * omp_get_thread_num()]);
+        snrt_ssr_loop_1d(SNRT_SSR_DM2, AXPY_N / nthreads, sizeof(double));
+        snrt_ssr_write(SNRT_SSR_DM2, SNRT_SSR_1D,
+                       &data_y[AXPY_N / nthreads * omp_get_thread_num()]);
+        snrt_ssr_enable();
 #pragma omp for schedule(static)
         for (unsigned i = 0; i < AXPY_N; i++) {
-            // data_y[i] = data_a * data_x[i] + data_y[i];
-            // data_y[i] = data_a * __builtin_ssr_pop(0) +
-            __builtin_ssr_pop(1);
-            __builtin_ssr_push(
-                2, data_a * __builtin_ssr_pop(0) + __builtin_ssr_pop(1));
+            asm volatile("fmadd.d ft2, %[a], ft0, ft1\n"
+                         :
+                         : [ a ] "f"(data_a)
+                         : "ft0", "ft1", "ft2", "memory");
         }
-        __builtin_ssr_disable();
+        snrt_ssr_disable();
     }
 
     // check data
@@ -56,9 +55,13 @@ unsigned __attribute__((noinline)) static_schedule(void) {
 
     if (errs) printf("Error [static_schedule]: %d mismatches\n", errs);
     return errs ? 1 : 0;
+#else
+    return 0;
+#endif
 }
 
 int main() {
+#ifdef SNRT_SUPPORTS_SSR
     unsigned core_idx = snrt_cluster_core_idx();
     unsigned core_num = snrt_cluster_core_num();
     unsigned err = 0;
@@ -73,4 +76,5 @@ int main() {
     // exit
     __snrt_omp_destroy(core_idx);
     return err;
+#endif
 }

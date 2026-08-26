@@ -11,6 +11,7 @@ void gemm_fp16_naive(uint32_t setup_ssr, uint32_t partition_banks,
                      uint32_t transa, uint32_t transb, uint32_t M, uint32_t N,
                      uint32_t K, void* A_p, uint32_t lda, void* B_p,
                      uint32_t ldb, uint32_t beta, void* C_p, uint32_t ldc) {
+#ifdef SNRT_SUPPORTS_SMALLFLOAT
     __fp16* A = (__fp16*)A_p;
     __fp16* B = (__fp16*)B_p;
     __fp16* C = (__fp16*)C_p;
@@ -44,12 +45,14 @@ void gemm_fp16_naive(uint32_t setup_ssr, uint32_t partition_banks,
             C[m * ldc + n] = c;
         }
     }
+#endif
 }
 
 void gemm_fp16_baseline(uint32_t setup_ssr, uint32_t transa, uint32_t transb,
                         uint32_t M, uint32_t N, uint32_t K, void* A_p,
                         uint32_t lda, void* B_p, uint32_t ldb, uint32_t beta,
                         void* C_p, uint32_t ldc) {
+#ifdef SNRT_SUPPORTS_SMALLFLOAT
     __fp16* A = (__fp16*)A_p;
     __fp16* B = (__fp16*)B_p;
     __fp16* C = (__fp16*)C_p;
@@ -61,8 +64,6 @@ void gemm_fp16_baseline(uint32_t setup_ssr, uint32_t transa, uint32_t transb,
             v4f16 a, b;
             volatile __fp16* c_ptr;
             const float zero = 0.0;
-            double c = 0.0;
-            v4f16 reduce_reg;
 
             a_ptr = (v4f16*)(&A[m * lda]);
             b_ptr = (v4f16*)(&B[n * ldb]);
@@ -96,18 +97,21 @@ void gemm_fp16_baseline(uint32_t setup_ssr, uint32_t transa, uint32_t transb,
                 // Store results
                 "fsh ft3, 0(%[C]) \n"
                 : [ a_ptr ] "+r"(a_ptr), [ b_ptr ] "+r"(b_ptr)
-                : [ c ] "f"(c), [ reduce_reg ] "f"(reduce_reg),
-                  [ C ] "r"(c_ptr), [ beta ] "r"(beta), [ K ] "r"(K),
+                : [ C ] "r"(c_ptr), [ beta ] "r"(beta), [ K ] "r"(K),
                   [ zero ] "f"(zero)
                 : "ft0", "ft1", "ft2", "ft3", "ft4", "t0");
         }
     }
+#endif
 }
 
 void gemm_fp16_opt(uint32_t setup_ssr, uint32_t partition_banks,
                    uint32_t transa, uint32_t transb, uint32_t M, uint32_t N,
                    uint32_t K, void* A_p, uint32_t lda, void* B_p, uint32_t ldb,
                    uint32_t beta, void* C_p, uint32_t ldc) {
+#ifdef SNRT_SUPPORTS_FREP
+#ifdef SNRT_SUPPORTS_SMALLFLOAT
+
     __fp16* A = (__fp16*)A_p;
     __fp16* B = (__fp16*)B_p;
     __fp16* C = (__fp16*)C_p;
@@ -153,8 +157,8 @@ void gemm_fp16_opt(uint32_t setup_ssr, uint32_t partition_banks,
         for (uint32_t n0 = 0; n0 < N / unroll; n0++) {
             __fp16* _C = &C[m * ldc + n];
             const float zero = 0.0;
-            v4f16 c[unroll];
-            v2f32 reduce_reg[unroll];
+            double c[unroll];
+            double reduce_reg[unroll];
 
             asm volatile(
                 "beqz %[beta], 1f \n"
@@ -294,15 +298,19 @@ void gemm_fp16_opt(uint32_t setup_ssr, uint32_t partition_banks,
     }
 
     snrt_ssr_disable();
+#endif
+#endif
 }
 
 void gemm_fp16_opt_ex(uint32_t setup_ssr, uint32_t partition_banks,
                       uint32_t transa, uint32_t transb, uint32_t M, uint32_t N,
                       uint32_t K, void* A_p, uint32_t lda, void* B_p,
                       uint32_t ldb, uint32_t beta, void* C_p, uint32_t ldc) {
+#ifdef SNRT_SUPPORTS_FREP
+#ifdef SNRT_SUPPORTS_SMALLFLOAT
     __fp16* A = (__fp16*)A_p;
     __fp16* B = (__fp16*)B_p;
-    __fp16* C = (__fp16*)C_p;
+    __fp16* C = (__fp16*)C_p;  // Should be double-aligned (see fsd below)
 
     // Unrolling factor of most inner loop.
     // Should be at least as high as the FMA delay
@@ -345,8 +353,8 @@ void gemm_fp16_opt_ex(uint32_t setup_ssr, uint32_t partition_banks,
         for (uint32_t n0 = 0; n0 < N / unroll; n0++) {
             __fp16* _C = &C[m * ldc + n];
             const float zero = 0.0;
-            v4f16 c[unroll];
-            v2f32 reduce_reg[unroll];
+            double c[unroll];
+            double reduce_reg[unroll];
 
             asm volatile(
                 "beqz %[beta], 1f \n"
@@ -466,4 +474,6 @@ void gemm_fp16_opt_ex(uint32_t setup_ssr, uint32_t partition_banks,
     }
 
     snrt_ssr_disable();
+#endif
+#endif
 }

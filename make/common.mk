@@ -20,16 +20,15 @@ SN_BIN_DIR    = $(SN_TARGET_DIR)/sim/build/bin
 SN_WORK_DIR   = $(SN_TARGET_DIR)/sim/build/work
 
 # External executables
-SN_BENDER	      ?= bender
+SN_BENDER         ?= bender
 SN_PEAKRDL        ?= peakrdl
 SN_VERIBLE_FMT    ?= verible-verilog-format
-SN_CLANG_FORMAT   ?= clang-format
-SN_RISCV_MC       ?= $(SN_LLVM_BINROOT)/llvm-mc
-SN_ADDR2LINE      ?= $(SN_LLVM_BINROOT)/llvm-addr2line
+SN_CLANG_FORMAT   ?= $(SN_LLVM_BINROOT)/clang-format
 # tail is required for nonsense oseda output
 SN_VERILATOR_SEPP ?=
 SN_VLT_BIN         = $(shell $(SN_VERILATOR_SEPP) which verilator_bin | tail -n1 | $(SN_VERILATOR_SEPP) xargs realpath | tail -n1)
 SN_VLT            ?= $(SN_VERILATOR_SEPP) verilator
+SN_SG_SHELL       ?= sg_shell
 
 # Internal executables
 SN_GENTRACE_PY  ?= $(SN_UTIL_DIR)/trace/gen_trace.py
@@ -48,18 +47,23 @@ SN_GENTRACE_SRC = $(SN_UTIL_DIR)/trace/sequencer.py
 SN_ANNOTATE_SRC = $(SN_UTIL_DIR)/trace/a2l.py
 
 # Clustergen prerequisites
-SN_CLUSTER_GEN_SRC = $(SN_ROOT)/util/clustergen/cluster.py
+SN_CLUSTER_GEN_SRC  = $(SN_ROOT)/util/clustergen/cluster.py
+SN_CLUSTER_GEN_SRC += $(SN_ROOT)/util/clustergen/snitch_cluster.schema.json
 
 # Bender prerequisites
-SN_BENDER_LOCK = $(SN_ROOT)/Bender.lock
-SN_BENDER_YML  = $(SN_ROOT)/Bender.yml
+SN_BENDER_LOCK     = $(SN_ROOT)/Bender.lock
+SN_BENDER_YML      = $(SN_ROOT)/Bender.yml
+SN_BENDER_PREREQS  = $(SN_BENDER_LOCK)
+SN_BENDER_PREREQS += $(SN_BENDER_YML)
 
 # Flags
-SN_COMMON_BENDER_FLAGS     += -t rtl -t snitch_cluster
-SN_COMMON_BENDER_SIM_FLAGS += -t simulation -t test
-SN_RISCV_MC_FLAGS          ?= -disassemble -mcpu=snitch
-SN_ANNOTATE_FLAGS          ?= -q --keep-time --addr2line=$(SN_ADDR2LINE)
-SN_LAYOUT_EVENTS_FLAGS     ?= --cfg=$(SN_CFG)
+SN_COMMON_BENDER_FLAGS      += -t rtl -t cc_no_deprecated -t tech_cells_generic_include_tc_sync
+SN_COMMON_BENDER_SIM_FLAGS  += $(SN_COMMON_BENDER_FLAGS) -t test -t snitch_cluster:tb
+ifeq ($(DEBUG),ON)
+SN_COMMON_BENDER_SIM_FLAGS  += -DDEBUG
+endif
+SN_COMMON_BENDER_ASIC_FLAGS += $(SN_COMMON_BENDER_FLAGS) -t asic
+SN_LAYOUT_EVENTS_FLAGS      ?= --cfg=$(SN_CFG)
 
 # Internal state
 SN_DEPS :=
@@ -108,8 +112,9 @@ endef
 # Arg 3: bender arguments
 # Arg 4: top module name
 # Arg 5: name of target for which prerequisites are generated
+# Arg 6: additional prerequisites to generate Bender filelist
 define sn_gen_rtl_prerequisites
-$(2)/$(4).f: $(SN_BENDER_YML) $(SN_BENDER_LOCK) | $(2)
+$(2)/$(4).f: $(SN_BENDER_PREREQS) $(SN_GEN_RTL_SRCS) $(6) | $(2)
 	$(SN_BENDER) script verilator $(3) > $$@
 
 $(1): $(2)/$(4).f $(SN_GEN_RTL_SRCS) | $(2)
@@ -125,5 +130,5 @@ endef
 # Usage:
 #   $(call sn_include_deps)
 define sn_include_deps
-$(eval $(if $(strip $(MAKECMDGOALS)),$(shell list-dependent-make-targets -M -r $(SN_DEPS))))
+$(eval $(if $(strip $(SN_DEPS)),$(if $(strip $(MAKECMDGOALS)),$(shell list-dependent-make-targets -M -r -f "$(MAKEOVERRIDES)" $(SN_DEPS)))))
 endef

@@ -2,6 +2,10 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
+# Simulation model build is dependent on rtl.mk and must thus be deferred
+# after the rtl.mk file is included and read.
+ifdef SN_RTL_MK_READ
+
 #############
 # Variables #
 #############
@@ -17,7 +21,7 @@ SN_VLIB        ?= $(SN_QUESTA_SEPP) vlib
 SN_VSIM_BUILDDIR ?= $(SN_TARGET_DIR)/sim/build/work-vsim
 
 # Flags
-SN_VSIM_BENDER_FLAGS = $(SN_COMMON_BENDER_FLAGS) $(SN_COMMON_BENDER_SIM_FLAGS) -t vsim
+SN_VSIM_BENDER_FLAGS = $(SN_COMMON_BENDER_SIM_FLAGS) -t vsim
 SN_VLOG_FLAGS += -64
 SN_VLOG_FLAGS += -svinputport=compat
 SN_VLOG_FLAGS += -override_timescale 1ns/1ps
@@ -34,11 +38,15 @@ ifeq ($(DEBUG), ON)
 SN_VSIM_FLAGS += -do "log -r /*"
 SN_VOPT_FLAGS  = +acc
 endif
+# TRACE flag allows to disable logging core traces (enabled by default)
+ifeq ($(TRACE), OFF)
+SN_VLOG_FLAGS += +define+TRACE_OFF
+endif
 
-# PL_SIM flag selects between RTL or post-layout simulation
-ifeq ($(PL_SIM), 1)
+# GF12 physical simulation options
+ifeq ($(TECH),gf12)
 include $(SN_ROOT)/nonfree/gf12/modelsim/Makefrag
-SN_COMMON_BENDER_FLAGS += -t postlayout
+SN_COMMON_BENDER_FLAGS += -t gf12 -t netlist
 SN_VOPT_FLAGS += -modelsimini $(SN_ROOT)/nonfree/gf12/modelsim/modelsim.ini
 SN_VOPT_FLAGS += +nospecify
 SN_VOPT_FLAGS += $(SN_GATE_LIBS)
@@ -46,9 +54,18 @@ SN_VSIM_FLAGS += -modelsimini $(SN_ROOT)/nonfree/gf12/modelsim/modelsim.ini
 SN_VSIM_FLAGS += +nospecify
 endif
 
-# VCD_DUMP flag enables VCD dump generation
+# IHP130 physical simulation options
+ifeq ($(TECH),ihp13)
+SN_COMMON_BENDER_FLAGS += -t ihp13 -t netlist 
+SN_COMMON_BENDER_FLAGS += -DSIMULATION
+endif
+
+# VCD_DUMP / SAIF_DUMP flags enable VCD or SAIF dump generation. Only
+# one should be set at a time; if both are set, VCD_DUMP has priority.
 ifeq ($(VCD_DUMP), 1)
 SN_VSIM_FLAGS += -do "source $(SN_ROOT)/nonfree/gf12/modelsim/vcd.tcl"
+else ifeq ($(SAIF_DUMP), 1)
+SN_VSIM_FLAGS += -do "source $(SN_ROOT)/nonfree/gf12/modelsim/saif.tcl"
 else
 SN_VSIM_FLAGS += -do "run -a"
 endif
@@ -75,7 +92,7 @@ $(SN_VSIM_BUILDDIR):
 $(eval $(call sn_gen_rtl_prerequisites,$(SN_VSIM_RTL_PREREQ_FILE),$(SN_VSIM_BUILDDIR),$(SN_VSIM_BENDER_FLAGS),$(SN_VSIM_TOP_MODULE),$(SN_BIN_DIR)/$(TARGET).vsim))
 
 # Generate compilation script
-$(SN_VSIM_BUILDDIR)/compile.vsim.tcl: $(SN_BENDER_YML) $(SN_BENDER_LOCK) | $(SN_VSIM_BUILDDIR)
+$(SN_VSIM_BUILDDIR)/compile.vsim.tcl: $(SN_BENDER_PREREQS) | $(SN_VSIM_BUILDDIR)
 	$(SN_VLIB) $(dir $@)
 	$(SN_BENDER) script vsim $(SN_VSIM_BENDER_FLAGS) --vlog-arg="$(SN_VLOG_FLAGS) " > $@
 	echo '$(SN_VLOG) -work $(SN_VSIM_BUILDDIR) $(SN_TB_CC_SOURCES) $(SN_RTL_CC_SOURCES) -vv -ccflags "$(SN_TB_CC_FLAGS)"' >> $@
@@ -116,3 +133,5 @@ clean-vsim: clean-work
 clean: clean-vsim
 
 SN_DEPS += $(SN_VSIM_RTL_PREREQ_FILE)
+
+endif

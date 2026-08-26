@@ -2,6 +2,10 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
+#ifndef SNRT_SUPPORTS_DMA
+#include <string.h>
+#endif
+
 /**
  * @file
  * @brief This file provides functions to program the Snitch DMA.
@@ -11,9 +15,6 @@
 
 #include <math.h>
 
-/// A DMA transfer identifier.
-typedef uint32_t snrt_dma_txid_t;
-
 /**
  * @brief Start an asynchronous 1D DMA transfer with 64-bit wide pointers on a
  *        specific DMA channel.
@@ -22,31 +23,30 @@ typedef uint32_t snrt_dma_txid_t;
  * @param size The size of the transfer in bytes.
  * @param channel The index of the channel.
  * @return The DMA transfer ID.
- * @note The function passes the @p channel argument as an immediate,
- *       thus this must be known at compile time. As a consequence, the
- *       function must use internal linkage (`static` keyword) and must be
- *       always inlined. This is true also for all functions invoking this
- *       function, and passing down an argument to @p channel.
  */
-static inline uint32_t snrt_dma_start_1d(uint64_t dst, uint64_t src,
-                                         size_t size,
-                                         const uint32_t channel = 0) {
+inline uint32_t snrt_dma_start_1d(uint64_t dst, uint64_t src, size_t size,
+                                  uint32_t channel) {
+#ifdef SNRT_SUPPORTS_DMA
     uint32_t dst_lo = dst & 0xFFFFFFFF;
     uint32_t dst_hi = dst >> 32;
     uint32_t src_lo = src & 0xFFFFFFFF;
     uint32_t src_hi = src >> 32;
+    uint32_t cfg = (channel << 2) | 0b00;
     uint32_t txid;
 
     asm volatile(
         "dmsrc %[src_lo], %[src_hi] \n"
         "dmdst %[dst_lo], %[dst_hi] \n"
-        "dmcpyi %[txid], %[size], (%[channel] << 2) | 0b00 \n"
+        "dmcpy %[txid], %[size], %[cfg] \n"
         : [ txid ] "=r"(txid)
         : [ src_lo ] "r"(src_lo), [ src_hi ] "r"(src_hi),
           [ dst_lo ] "r"(dst_lo), [ dst_hi ] "r"(dst_hi), [ size ] "r"(size),
-          [ channel ] "i"(channel));
-
+          [ cfg ] "r"(cfg));
     return txid;
+#else
+    memcpy((void *)dst, (const void *)src, size);
+    return 0;
+#endif
 }
 
 /**
@@ -55,40 +55,151 @@ static inline uint32_t snrt_dma_start_1d(uint64_t dst, uint64_t src,
  * This is a convenience overload of snrt_dma_start_1d(uint64_t, uint64_t, size_t, uint32_t)
  * using `void*` pointers.
  */
-static inline uint32_t snrt_dma_start_1d(volatile void *dst, volatile void *src,
-                                         size_t size,
-                                         const uint32_t channel = 0) {
+inline uint32_t snrt_dma_start_1d(volatile void *dst, volatile void *src,
+                                  size_t size, uint32_t channel = 0) {
     return snrt_dma_start_1d((uint64_t)dst, (uint64_t)src, size, channel);
 }
 
 /**
- * @brief Enable multicast for successive transfers.
- * @param mask Multicast mask applied to successive transfers.
+ * @brief Set AW user field of the DMA's AXI interface
+ * @details All DMA transfers performed after this call are equipped with the
+ *          given AW user field
+ *
+ * @param field Defines the AW user field for the AXI transfer
  */
-inline void snrt_dma_enable_mcast(uint32_t mask) {
-    asm volatile("dmuser %[mask], zero \n" : : [ mask ] "r"(mask));
+inline void snrt_dma_set_awuser(uint64_t field) {
+#ifdef SNRT_SUPPORTS_DMA
+    uint32_t user_low = (uint32_t)(field);
+    uint32_t user_high = (uint32_t)(field >> 32);
+    asm volatile("dmuser %[user_low], %[user_high] \n"
+                 :
+                 : [ user_low ] "r"(user_low), [ user_high ] "r"(user_high));
+#endif
 }
 
 /**
- * @brief Disable multicast for successive transfers.
- * @details Resets the multicast mask to zero.
+ * @brief Enable multicast for successive transfers
+ * @details All transfers performed after this call will be multicast to all
+ *          addresses specified by the address and mask pair.
+ *
+ * @param mask Multicast mask value
  */
-inline void snrt_dma_disable_mcast() { asm volatile("dmuser zero, zero \n"); }
+inline void snrt_dma_enable_multicast(uint64_t mask) {
+    snrt_collective_t op;
+    op.f.opcode = SNRT_COLLECTIVE_MULTICAST;
+    op.f.mask = mask;
+    snrt_dma_set_awuser(op.w);
+}
+
+/**
+ * @brief Enable reduction operations for successive transfers
+ * @details All transfers performed after this call will be part of a reduction
+ *          involving all masters identified by the mask.
+ *
+ * @param mask Mask defines all involved members
+ * @param opcode Type of reduction operation
+ */
+inline void snrt_dma_enable_reduction(uint64_t mask,
+                                      snrt_collective_opcode_t opcode) {
+    snrt_collective_t op;
+    op.f.opcode = opcode;
+    op.f.mask = mask;
+    snrt_dma_set_awuser(op.w);
+}
+
+/**
+ * @brief Disable multicast for successive transfers
+ * @details Successive DMA transfers will be unicast transfers
+ */
+inline void snrt_dma_disable_multicast() { snrt_dma_set_awuser(0); }
+
+/**
+ * @brief Disable reduction operations for successive transfers
+ * @details Successive DMA transfers will be unicast transfers
+ */
+inline void snrt_dma_disable_reduction() { snrt_dma_set_awuser(0); }
+
+/**
+ * @brief Start an asynchronous reduction 1D DMA transfer with 64-bit wide
+ * pointers.
+ * @param mask Mask defines all involved members
+ * @param opcode Reduction operation
+ * @see snrt_dma_start_1d(uint64_t, uint64_t, size_t, uint32_t) for a
+ *      description of the other parameters.
+ */
+inline uint32_t snrt_dma_start_1d_reduction(uint64_t dst, uint64_t src,
+                                            size_t size, uint64_t mask,
+                                            snrt_collective_opcode_t opcode,
+                                            uint32_t channel = 0) {
+    snrt_dma_enable_reduction(mask, opcode);
+    uint32_t txid = snrt_dma_start_1d(dst, src, size, channel);
+    snrt_dma_disable_reduction();
+    return txid;
+}
+
+/**
+ * @brief Start an asynchronous reduction 1D DMA transfer with 64-bit wide
+ * pointers.
+ * @param comm The communicator for the reduction operation
+ * @param opcode Reduction operation
+ * @see snrt_dma_start_1d(uint64_t, uint64_t, size_t, uint32_t) for a
+ *      description of the other parameters.
+ */
+inline uint32_t snrt_dma_start_1d_reduction(uint64_t dst, uint64_t src,
+                                            size_t size, snrt_comm_t comm,
+                                            snrt_collective_opcode_t opcode,
+                                            uint32_t channel = 0) {
+    uint64_t mask = snrt_get_collective_mask(comm);
+    uint32_t txid =
+        snrt_dma_start_1d_reduction(dst, src, size, mask, opcode, channel);
+    return txid;
+}
 
 /**
  * @brief Start an asynchronous multicast 1D DMA transfer with 64-bit wide
  * pointers.
- * @param mask Multicast mask applied on the destination address.
+ * @param mask The mask for the multicast operation
  * @see snrt_dma_start_1d(uint64_t, uint64_t, size_t, uint32_t) for a
  *      description of the other parameters.
  */
-static inline uint32_t snrt_dma_start_1d_mcast(uint64_t dst, uint64_t src,
-                                               size_t size, uint32_t mask,
-                                               const uint32_t channel = 0) {
-    snrt_dma_enable_mcast(mask);
+inline uint32_t snrt_dma_start_1d_mcast(uint64_t dst, uint64_t src, size_t size,
+                                        uint64_t mask, uint32_t channel = 0) {
+    snrt_dma_enable_multicast(mask);
     uint32_t txid = snrt_dma_start_1d(dst, src, size, channel);
-    snrt_dma_disable_mcast();
+    snrt_dma_disable_multicast();
     return txid;
+}
+
+/**
+ * @brief Start an asynchronous multicast 1D DMA transfer with 64-bit wide
+ * pointers.
+ * @param comm The communicator for the multicast operation
+ * @see snrt_dma_start_1d(uint64_t, uint64_t, size_t, uint32_t) for a
+ *      description of the other parameters.
+ */
+inline uint32_t snrt_dma_start_1d_mcast(uint64_t dst, uint64_t src, size_t size,
+                                        snrt_comm_t comm,
+                                        uint32_t channel = 0) {
+    uint64_t mask = snrt_get_collective_mask(comm);
+    uint32_t txid = snrt_dma_start_1d_mcast(dst, src, size, mask, channel);
+    return txid;
+}
+
+/**
+ * @brief Start an asynchronous reduction 1D DMA transfer using native-size
+ * pointers.
+ *
+ * This is a convenience overload of
+ * snrt_dma_start_1d_reduction(uint64_t, uint64_t, size_t, uint64_t, uint32_t, uint32_t)
+ * using `void*` pointers.
+ */
+inline uint32_t snrt_dma_start_1d_reduction(volatile void *dst,
+                                            volatile void *src, size_t size,
+                                            uint64_t mask,
+                                            snrt_collective_opcode_t opcode,
+                                            uint32_t channel = 0) {
+    return snrt_dma_start_1d_reduction((uint64_t)dst, (uint64_t)src, size, mask,
+                                       opcode, channel);
 }
 
 /**
@@ -96,13 +207,12 @@ static inline uint32_t snrt_dma_start_1d_mcast(uint64_t dst, uint64_t src,
  * pointers.
  *
  * This is a convenience overload of
- * snrt_dma_start_1d_mcast(uint64_t, uint64_t, size_t, uint32_t, uint32_t)
+ * snrt_dma_start_1d_mcast(uint64_t, uint64_t, size_t, uint64_t, uint32_t)
  * using `void*` pointers.
  */
-static inline uint32_t snrt_dma_start_1d_mcast(volatile void *dst,
-                                               volatile void *src, size_t size,
-                                               uint32_t mask,
-                                               const uint32_t channel = 0) {
+inline uint32_t snrt_dma_start_1d_mcast(volatile void *dst, volatile void *src,
+                                        size_t size, uint64_t mask,
+                                        uint32_t channel = 0) {
     return snrt_dma_start_1d_mcast((uint64_t)dst, (uint64_t)src, size, mask,
                                    channel);
 }
@@ -119,21 +229,17 @@ static inline uint32_t snrt_dma_start_1d_mcast(volatile void *dst,
  * @param repeat The number of 1D transfers composing the 2D transfer.
  * @param channel The index of the channel.
  * @return The DMA transfer ID.
- * @note The function passes the @p channel argument as an immediate,
- *       thus this must be known at compile time. As a consequence, the
- *       function must use internal linkage (`static` keyword) and must be
- *       always inlined. This is true also for all functions invoking this
- *       function, and passing down an argument to @p channel.
  */
-static inline snrt_dma_txid_t snrt_dma_start_2d(uint64_t dst, uint64_t src,
-                                                size_t size, size_t dst_stride,
-                                                size_t src_stride,
-                                                size_t repeat,
-                                                const uint32_t channel = 0) {
+inline snrt_dma_txid_t snrt_dma_start_2d(uint64_t dst, uint64_t src,
+                                         size_t size, size_t dst_stride,
+                                         size_t src_stride, size_t repeat,
+                                         uint32_t channel) {
+#ifdef SNRT_SUPPORTS_DMA
     uint32_t dst_lo = dst & 0xFFFFFFFF;
     uint32_t dst_hi = dst >> 32;
     uint32_t src_lo = src & 0xFFFFFFFF;
     uint32_t src_hi = src >> 32;
+    uint32_t cfg = (channel << 2) | 0b10;
     uint32_t txid;
 
     asm volatile(
@@ -141,14 +247,18 @@ static inline snrt_dma_txid_t snrt_dma_start_2d(uint64_t dst, uint64_t src,
         "dmdst %[dst_lo], %[dst_hi] \n"
         "dmstr %[src_stride], %[dst_stride] \n"
         "dmrep %[repeat] \n"
-        "dmcpyi %[txid], %[size], (%[channel] << 2) | 0b10 \n"
+        "dmcpy %[txid], %[size], %[cfg] \n"
         : [ txid ] "=r"(txid)
         : [ src_lo ] "r"(src_lo), [ src_hi ] "r"(src_hi),
           [ dst_lo ] "r"(dst_lo), [ dst_hi ] "r"(dst_hi),
           [ dst_stride ] "r"(dst_stride), [ src_stride ] "r"(src_stride),
-          [ repeat ] "r"(repeat), [ size ] "r"(size), [ channel ] "i"(channel));
+          [ repeat ] "r"(repeat), [ size ] "r"(size), [ cfg ] "r"(cfg));
 
     return txid;
+#else
+    // TODO(colluca): we can implement this as a series of memcpy calls
+    return 0;
+#endif
 }
 
 /**
@@ -158,10 +268,10 @@ static inline snrt_dma_txid_t snrt_dma_start_2d(uint64_t dst, uint64_t src,
  * snrt_dma_start_2d(uint64_t, uint64_t, size_t, size_t, size_t, size_t, uint32_t)
  * using `void*` pointers.
  */
-static inline uint32_t snrt_dma_start_2d(volatile void *dst, volatile void *src,
-                                         size_t size, size_t dst_stride,
-                                         size_t src_stride, size_t repeat,
-                                         const uint32_t channel = 0) {
+inline uint32_t snrt_dma_start_2d(volatile void *dst, volatile void *src,
+                                  size_t size, size_t dst_stride,
+                                  size_t src_stride, size_t repeat,
+                                  uint32_t channel = 0) {
     return snrt_dma_start_2d((uint64_t)dst, (uint64_t)src, size, dst_stride,
                              src_stride, repeat, channel);
 }
@@ -175,15 +285,14 @@ static inline uint32_t snrt_dma_start_2d(volatile void *dst, volatile void *src,
  * @see snrt_dma_start_2d(uint64_t, uint64_t, size_t, size_t, size_t, size_t, uint32_t)
  *      for a description of the other parameters.
  */
-static inline uint32_t snrt_dma_start_2d_mcast(uint64_t dst, uint64_t src,
-                                               size_t size, size_t dst_stride,
-                                               size_t src_stride, size_t repeat,
-                                               uint32_t mask,
-                                               const uint32_t channel = 0) {
-    snrt_dma_enable_mcast(mask);
+inline uint32_t snrt_dma_start_2d_mcast(uint64_t dst, uint64_t src, size_t size,
+                                        size_t dst_stride, size_t src_stride,
+                                        size_t repeat, uint32_t mask,
+                                        uint32_t channel = 0) {
+    snrt_dma_enable_multicast(mask);
     uint32_t txid = snrt_dma_start_2d(dst, src, size, dst_stride, src_stride,
                                       repeat, channel);
-    snrt_dma_disable_mcast();
+    snrt_dma_disable_multicast();
     return txid;
 }
 
@@ -195,15 +304,57 @@ static inline uint32_t snrt_dma_start_2d_mcast(uint64_t dst, uint64_t src,
  * snrt_dma_start_2d_mcast(uint64_t, uint64_t, size_t, size_t, size_t, size_t, uint32_t, uint32_t)
  * using `void*` pointers.
  */
-static inline uint32_t snrt_dma_start_2d_mcast(volatile void *dst,
-                                               volatile void *src, size_t size,
-                                               size_t dst_stride,
-                                               size_t src_stride, size_t repeat,
-                                               uint32_t mask,
-                                               const uint32_t channel = 0) {
+inline uint32_t snrt_dma_start_2d_mcast(volatile void *dst, volatile void *src,
+                                        size_t size, size_t dst_stride,
+                                        size_t src_stride, size_t repeat,
+                                        uint32_t mask, uint32_t channel = 0) {
     return snrt_dma_start_2d_mcast((uint64_t)dst, (uint64_t)src, size,
                                    dst_stride, src_stride, repeat, mask,
                                    channel);
+}
+
+/**
+ * @brief Read DMA busy flag.
+ * @param channel The index of the channel.
+ * @note The function passes the @p channel argument as an immediate,
+ *       thus this must be known at compile time. As a consequence, the
+ *       function must use internal linkage (`static` keyword) and must be
+ *       always inlined. This is true also for all functions invoking this
+ *       function, and passing down an argument to @p channel.
+ */
+static inline uint32_t snrt_dma_busy(const uint32_t channel) {
+#ifdef SNRT_SUPPORTS_DMA
+    uint32_t busy;
+    asm volatile("dmstati %[busy], (%[channel] << 2) | 2 \n"
+                 : [ busy ] "=r"(busy)
+                 : [ channel ] "i"(channel)
+                 :);
+    return busy;
+#else
+    return 0;
+#endif
+}
+
+/**
+ * @brief Read DMA would_block flag.
+ * @param channel The index of the channel.
+ * @note The function passes the @p channel argument as an immediate,
+ *       thus this must be known at compile time. As a consequence, the
+ *       function must use internal linkage (`static` keyword) and must be
+ *       always inlined. This is true also for all functions invoking this
+ *       function, and passing down an argument to @p channel.
+ */
+static inline uint32_t snrt_dma_would_block(const uint32_t channel) {
+#ifdef SNRT_SUPPORTS_DMA
+    uint32_t would_block;
+    asm volatile("dmstati %[would_block], (%[channel] << 2) | 3 \n"
+                 : [ would_block ] "=r"(would_block)
+                 : [ channel ] "i"(channel)
+                 :);
+    return would_block;
+#else
+    return 0;
+#endif
 }
 
 /**
@@ -218,6 +369,7 @@ static inline uint32_t snrt_dma_start_2d_mcast(volatile void *dst,
  */
 static inline void snrt_dma_wait(snrt_dma_txid_t txid,
                                  const uint32_t channel = 0) {
+#ifdef SNRT_SUPPORTS_DMA
     asm volatile(
         "1: \n"
         "dmstati t0, (%[channel] << 2) | 0 \n"
@@ -225,6 +377,7 @@ static inline void snrt_dma_wait(snrt_dma_txid_t txid,
         :
         : [ txid ] "r"(txid), [ channel ] "i"(channel)
         : "t0");
+#endif
 }
 
 /**
@@ -237,13 +390,10 @@ static inline void snrt_dma_wait(snrt_dma_txid_t txid,
  *       function, and passing down an argument to @p channel.
  */
 static inline void snrt_dma_wait_all(const uint32_t channel = 0) {
-    uint32_t busy;
-    asm volatile(
-        "1: \n"
-        "dmstati %[busy], (%[channel] << 2) | 2 \n"
-        "bne %[busy], zero, 1b \n"
-        : [ busy ] "=r"(busy)
-        : [ channel ] "i"(channel));
+#ifdef SNRT_SUPPORTS_DMA
+    while (snrt_dma_busy(channel))
+        ;
+#endif
 }
 
 /**
@@ -262,7 +412,11 @@ inline void snrt_dma_wait_all_channels(uint32_t num_channels) {
  * analyzed.
  * @deprecated
  */
-inline void snrt_dma_start_tracking() { asm volatile("dmstati zero, 0 \n"); }
+inline void snrt_dma_start_tracking() {
+#ifdef SNRT_SUPPORTS_DMA
+    asm volatile("dmstati zero, 0 \n");
+#endif
+}
 
 /**
  * @brief Stop tracking of dma performance region. Does not have any
@@ -270,7 +424,11 @@ inline void snrt_dma_start_tracking() { asm volatile("dmstati zero, 0 \n"); }
  * analyzed.
  * @deprecated
  */
-inline void snrt_dma_stop_tracking() { asm volatile("dmstati zero, 0 \n"); }
+inline void snrt_dma_stop_tracking() {
+#ifdef SNRT_SUPPORTS_DMA
+    asm volatile("dmstati zero, 0 \n");
+#endif
+}
 
 /**
  * @brief Fast memset function performed by DMA.
@@ -280,6 +438,7 @@ inline void snrt_dma_stop_tracking() { asm volatile("dmstati zero, 0 \n"); }
  *            the DMA.
  */
 inline void snrt_dma_memset(void *ptr, uint8_t value, uint32_t len) {
+#ifdef SNRT_SUPPORTS_DMA
     // We set the first 64 bytes to the value, and then we use the DMA to copy
     // these into the remaining memory region. DMA is used only if len is
     // larger than 64 bytes, and an integer multiple of 64 bytes.
@@ -296,6 +455,9 @@ inline void snrt_dma_memset(void *ptr, uint8_t value, uint32_t len) {
         snrt_dma_start_2d(ptr, ptr, 64, 64, 0, n_1d_transfers);
         snrt_dma_wait_all();
     }
+#else
+    memset(ptr, (int)value, len);
+#endif
 }
 
 /**
@@ -322,17 +484,36 @@ inline snrt_dma_txid_t snrt_dma_load_1d_tile(volatile void *dst,
  * @param tile_idx Index of the tile in the 1D array.
  * @param tile_size Number of elements within a tile of the 1D array.
  * @param prec Number of bytes of each element in the 1D array.
- * @param mcast Multicast mask applied on the destination address.
+ * @param mask Multicast mask applied on the destination address.
  */
 inline snrt_dma_txid_t snrt_dma_load_1d_tile_mcast(void *dst, void *src,
                                                    size_t tile_idx,
                                                    size_t tile_size,
                                                    uint32_t prec,
-                                                   uint32_t mcast) {
+                                                   uint64_t mask) {
     size_t tile_nbytes = tile_size * prec;
     return snrt_dma_start_1d_mcast((uintptr_t)dst,
                                    (uintptr_t)src + tile_idx * tile_nbytes,
-                                   tile_nbytes, mcast);
+                                   tile_nbytes, mask);
+}
+
+/**
+ * @brief Load a tile of a 1D array.
+ * @param dst Pointer to the tile destination.
+ * @param src Pointer to the source array.
+ * @param tile_idx Index of the tile in the 1D array.
+ * @param tile_size Number of elements within a tile of the 1D array.
+ * @param prec Number of bytes of each element in the 1D array.
+ * @param mask Mask for reduction operation.
+ * @param opcode Reduction operation.
+ */
+inline snrt_dma_txid_t snrt_dma_reduction_load_1d_tile(
+    void *dst, void *src, size_t tile_idx, size_t tile_size, uint32_t prec,
+    uint64_t mask, snrt_collective_opcode_t opcode) {
+    size_t tile_nbytes = tile_size * prec;
+    return snrt_dma_start_1d_reduction((uintptr_t)dst,
+                                       (uintptr_t)src + tile_idx * tile_nbytes,
+                                       tile_nbytes, mask, opcode);
 }
 
 /**
@@ -476,6 +657,26 @@ inline snrt_dma_txid_t snrt_dma_load_2d_tile_mcast(
     return snrt_dma_load_2d_tile_mcast(dst, src, tile_x1_idx, tile_x0_idx,
                                        tile_x1_size, tile_x0_size, full_x0_size,
                                        prec, tile_x0_size * prec, mask);
+}
+
+/**
+ * @brief Load a 2D tile of a 2D array using multicast.
+ * @param comm Communicator specifying which clusters to multicast to.
+ *
+ * The stride in the destination tile is assumed to be that of a 1D tile,
+ * effectively. In other words, this is similar to snrt_dma_2d_to_1d().
+ *
+ * @see snrt_dma_load_2d_tile_mcast(void *, void *, size_t, size_t, size_t, size_t, size_t, uint32_t, size_t, uint32_t)
+ *      for a detailed description of the parameters.
+ */
+inline snrt_dma_txid_t snrt_dma_load_2d_tile_mcast(
+    void *dst, void *src, size_t tile_x1_idx, size_t tile_x0_idx,
+    size_t tile_x1_size, size_t tile_x0_size, size_t full_x0_size,
+    uint32_t prec, snrt_comm_t comm) {
+    uint64_t mask = snrt_get_collective_mask(comm);
+    return snrt_dma_load_2d_tile_mcast(dst, src, tile_x1_idx, tile_x0_idx,
+                                       tile_x1_size, tile_x0_size, full_x0_size,
+                                       prec, mask);
 }
 
 /**

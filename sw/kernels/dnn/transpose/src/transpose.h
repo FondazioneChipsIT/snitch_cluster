@@ -58,6 +58,7 @@ static inline void transpose_baseline(T* input, T* output, uint32_t M,
  */
 static inline void transpose_fp64_opt(double* input, double* output, uint32_t M,
                                       uint32_t N, uint32_t M_stride) {
+#ifdef SNRT_SUPPORTS_FREP
     const uint32_t ssr_b[2] = {N, M};
     const uint32_t ssr0_i[2] = {sizeof(double), N * sizeof(double)};
     const uint32_t ssr1_i[2] = {sizeof(double) * M_stride, sizeof(double)};
@@ -77,6 +78,7 @@ static inline void transpose_fp64_opt(double* input, double* output, uint32_t M,
     snrt_ssr_disable();
 
     snrt_fpu_fence();
+#endif
 }
 
 /**
@@ -139,11 +141,8 @@ static inline void transpose_kernel(precision_t dtype, void* input,
 static inline void transpose_layer(transpose_layer_t const l) {
     uint32_t matrix_size = l.M * l.N * l.dtype;
 
-    char* ptr = (char*)snrt_l1_next();
-    void* input = ptr;
-    ptr += matrix_size;
-    void* output = ptr;
-    ptr += matrix_size;
+    void* input = snrt_l1_alloc_cluster_local(matrix_size, l.dtype);
+    void* output = snrt_l1_alloc_cluster_local(matrix_size, l.dtype);
 
     // DMA transfer the matrix into the cluster TCDM
     if (snrt_is_dm_core()) {

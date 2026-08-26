@@ -4,7 +4,7 @@
 
 variables:
   GIT_STRATEGY: clone
-  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_DEPTH: 0
   # Enable colors in CI terminal
   TERM: ansi
   FORCE_COLOR: 1
@@ -12,40 +12,52 @@ variables:
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: /usr/pack/gcc-9.2.0-af/linux-x64/bin/gcc
   LLVM_SYS_120_PREFIX: /usr/pack/llvm-12.0.1-af
   CMAKE: cmake-3.18.1
-  # Override pip cache directory
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+##########
+# Common #
+##########
 
 default:
+  # Allow interrupting long-running jobs when a new pipeline on the same branch is triggered
+  interruptible: true
   before_script:
-    source iis-setup.sh
-  cache: &global_cache
-    key:
-      files:
-        - pyproject.toml
-    paths:
-      - .cache/pip
-    policy: pull
+    - source iis-setup.sh
 
-
-#########
-# Setup #
-#########
-
-setup:
-  cache:
-    # inherit all global cache settings
-    <<: *global_cache
-    # override the policy
-    policy: pull-push
+# Reusable guard that skips a job when MAKE_TARGET's prerequisites haven't
+# changed w.r.t. main. Usage: extend this job and `!reference` its script
+# before the real one; MAKE_TARGET defaults to the job name.
+.skip-if-unchanged:
+  variables:
+    MAKE_TARGET: $CI_JOB_NAME
   script:
-    - echo "Setup completed."
+    - |
+      if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
+        BASE_SHA=$CI_COMMIT_BEFORE_SHA
+      else
+        git fetch origin main
+        BASE_SHA=$(git merge-base origin/main HEAD)
+      fi
+    - CHANGED=$(git diff --name-only $BASE_SHA HEAD | sed "s|^|$CI_PROJECT_DIR/|")
+    - PREREQS=$(list-make-prerequisites $MAKE_TARGET --recursive)
+    # Turn `CHANGED` into a regex to match entire directories (e.g. submodules) against
+    # individual files in `PREREQS`.
+    - |
+      CHANGED_PATTERN=$(sed -E 's/[.[\*^$()+?{}|]/\\&/g; s#^#^#; s#$#($|/)#' <<< "$CHANGED")
+    - TRIGGERS=$(grep -E -f <(printf '%s\n' "$CHANGED_PATTERN") <<< "$PREREQS" || true)
+    - |
+      if [ -n "$TRIGGERS" ]; then
+        echo "Running '$MAKE_TARGET': prerequisites changed since $BASE_SHA:"
+        echo "$TRIGGERS" | sed 's/^/  /'
+      else
+        echo "Skipping '$MAKE_TARGET': no prerequisites changed since $BASE_SHA"
+        exit 0
+      fi
 
 ##############
 # Build docs #
 ##############
 
 docs:
-  needs: [setup]
   script:
     - make docs
 
@@ -54,7 +66,6 @@ docs:
 #####################
 
 pytest:
-  needs: [setup]
   script:
     - pytest
 
@@ -63,13 +74,22 @@ pytest:
 #################################
 
 snitch-cluster-sw:
-  needs: [setup]
   script:
     - make sw -j
   artifacts:
     paths:
       - sw/**/build/*.elf
     expire_in: 1 day
+
+#################
+# Spyglass lint #
+#################
+
+spyglass:
+  script:
+    - make spyglass
+    - util/lint/check_spyglass_lint.py
+        util/lint/build/snitch_cluster_wrapper/consolidated_reports/snitch_cluster_wrapper_lint_lint_rtl/moresimple.rpt
 
 #######################
 # Standalone IP tests #
@@ -82,7 +102,6 @@ snitch-cluster-sw:
 # - snitch_dma
 # - snitch
 snitch-ip-tests:
-  needs: [setup]
   parallel:
     matrix:
       - IP:
@@ -90,97 +109,140 @@ snitch-ip-tests:
           - snitch_cluster
           - tcdm_interface
           - snitch_ssr
-          - reqrsp_interface
   script:
-    - cd hw/$IP
-    - ./util/compile.sh
-    - ./util/run_vsim.sh
+    - make rtl -j
+    - make test-$IP
 
-########################
-# Snitch cluster tests #
-########################
+####################
+# Simulation tests #
+####################
 
 # Verilator
 snitch-cluster-vlt:
-  needs: [setup, snitch-cluster-sw]
+  needs: [snitch-cluster-sw]
   script:
-    - make verilator
+    - make verilator TRACE=OFF -j
     - cd test
     - ../util/experiments/run.py run.yaml --simulator verilator -j --run-dir runs/vlt
 
-# # VCS
-# snitch-cluster-vcs:
-#   needs: [setup, snitch-cluster-sw]
-#   script:
-#     - make vcs
-#     - cd test
-#     - ../util/experiments/run.py run.yaml --simulator vcs -j --run-dir runs/vcs
+# VCS
+snitch-cluster-vcs:
+  needs: [snitch-cluster-sw]
+  script:
+    - make vcs TRACE=OFF -j
+    - cd test
+    - ../util/experiments/run.py run.yaml --simulator vcs -j --run-dir runs/vcs
 
 # Questa
 snitch-cluster-vsim:
-  needs: [setup, snitch-cluster-sw]
+  needs: [snitch-cluster-sw]
   script:
     - make vsim -j
     - cd test
     - ../util/experiments/run.py run.yaml --simulator vsim -j --run-dir runs/vsim
     - ../util/experiments/run.py riscv_tests_isa.yaml --simulator vsim -j --run-dir runs/vsim
+    # Test convenience Make target
+    - cd ..
+    - make vsim-run SN_BINARY=$PWD/sw/kernels/blas/axpy/build/axpy.elf \
+        SN_VERIFY_PY=$PWD/sw/kernels/blas/axpy/scripts/verify.py
     # Test trace annotation
-    - make -C .. SIM_DIR=$(PWD)/runs/vsim/simple annotate -j
+    - make SIM_DIR=$PWD/test/runs/vsim/simple annotate -j
     # Run additional, more extensive tests
-    - cd blas/gemm && ./test.sh && cd -
-    - cd dnn/transpose && ./test.sh && cd -
-    - cd dnn/flashattention_2 && ./test.sh && cd -
+    - cd test/blas/gemm && ./test.sh && cd -
+    - cd test/dnn/transpose && ./test.sh && cd -
+    # - cd test/dnn/flashattention_2 && ./test.sh && cd -
+  artifacts:
+    when: on_failure
+    expire_in: 1 day
+    paths:
+      - test/runs/vsim/**/sim.txt
+
 
 # Test OmegaNet TCDM interconnect
 snitch-cluster-omega-vsim:
-  needs: [setup]
   script:
     - make CFG_OVERRIDE=cfg/omega.json sw -j
-    - make vsim -j
+    - make vsim TRACE=OFF -j
     - cd test
     - ../util/experiments/run.py run.yaml --simulator vsim -j --run-dir runs/vsim
 
 # Test Multi-channel DMA
 snitch-cluster-mchan-vsim:
-  needs: [setup]
   script:
     - make CFG_OVERRIDE=cfg/dma_mchan.json sw -j
-    - make vsim -j
+    - make vsim TRACE=OFF -j
     - cd test
     - ../util/experiments/run.py dma_mchan.yaml --simulator vsim -j --run-dir runs/vsim
 
+# Test Mempool configuration
+snitch-cluster-mempool-vsim:
+  script:
+    - make CFG_OVERRIDE=cfg/mempool.json sw -j
+    - make vsim -j
+    - cd test
+    - ../util/experiments/run.py mempool.yaml --simulator vsim -j --run-dir runs/vsim
+    - make -C .. SIM_DIR=$PWD/runs/vsim/simple annotate -j
+
 # Additional tests for different FREP configurations
 snitch-cluster-frep-vsim:
-  needs: [setup]
   script:
     # Large FREP configuration
     - make CFG_OVERRIDE=cfg/frep_xl.json sw -j
-    - make vsim -j
+    - make vsim TRACE=OFF -j
     - cd test
     - ../util/experiments/run.py frep_xl.yaml --simulator vsim -j --run-dir runs/vsim
     - cd -
     # Small FREP configuration
     - make CFG_OVERRIDE=cfg/frep_xs.json sw -j
-    - make vsim -j
+    - make vsim TRACE=OFF -j
     - cd test
     - ../util/experiments/run.py frep_xs.yaml --simulator vsim -j --run-dir runs/vsim
 
-# COPIFT and scalar chaining experiments
-snitch-cluster-copift-sc-vsim:
-  needs: [setup]
+# Test Spatz configuration
+snitch-cluster-spatz-vsim:
+  script:
+    - make CFG_OVERRIDE=cfg/spatz.json sw -j
+    - make vsim TRACE=OFF -j
+    - cd test
+    - ../util/experiments/run.py spatz.yaml --simulator vsim -j --run-dir runs/vsim
+
+# COPIFT experiments
+snitch-cluster-copift-vsim:
   script:
     - make CFG_OVERRIDE=experiments/copift/cfg.json vsim -j
     - cd experiments/copift
     - ./experiments.py experiments.yaml --actions sw run perf -j
-    - cd ../chaining
+
+# Scalar chaining experiments
+snitch-cluster-chaining-vsim:
+  script:
+    - make CFG_OVERRIDE=experiments/copift/cfg.json vsim -j
+    - cd experiments/chaining
     - ./experiments.py experiments.yaml --actions sw run perf -j
 
-############
-# Non-free #
-############
+###################################
+# Open-source implementation flow #
+###################################
 
-nonfree:
-  needs: [setup]
+yosys:
+  timeout: 4h
+  extends: .skip-if-unchanged
   script:
-    - make nonfree
+    - !reference [.skip-if-unchanged, script]
+    - make CFG_OVERRIDE=cfg/yosys-ci.json yosys
+    # Following steps are not included in open-source CI since netlist
+    # compilation with Verilator takes an excessive amount of time and memory.
+    - make PS_FREE_SIM=1 vsim
+    - make sw -j
+    - make vsim-run SN_BINARY=$PWD/sw/tests/build/simple.elf
+
+#################
+# Non-free jobs #
+#################
+
+# Non-free elaboration flow
+elab:
+  extends: .skip-if-unchanged
+  script:
+    - !reference [.skip-if-unchanged, script]
     - make elab

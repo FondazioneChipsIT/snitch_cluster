@@ -351,20 +351,20 @@ Most of the logic in our verification script is implemented in convenience class
 
 ## Implementing the hardware
 
-If you make changes to the hardware, you probably also want to physically implement it to estimate the PPA impact of your modifications. As the physical implementation flow involves proprietary tools licensed under non-disclosure agreements, our physical implementation flow is contained in a separate private git repository. If you are an IIS user, with access to our Gitlab server and IIS machines, you may follow the next instructions to replicate our implementation flow.
+If you make changes to the hardware, you probably also want to physically implement it to estimate the PPA impact of your modifications.
+We currently support two physical implementation flows:
 
-Firstly, we need to clone all the sources for the physical flow. The following command takes care of everything for you:
-```shell
-make nonfree
-```
+- a proprietary (nonfree) flow using GF12 technology and Synopsys Fusion Compiler
+- a fully open-source flow using IHP130 technology and open-source EDA tools (inspired by the [Croc flow](https://github.com/pulp-platform/croc))
 
-Behind the scenes, it will clone the `snitch-cluster-nonfree` repo under the `nonfree` folder. Let's move into this folder:
+The following two subsections describe how to use the two flows.
 
-```shell
-cd nonfree
-```
+### Proprietary flow
 
-Here, you will find a Makefile with a series of convenience targets to launch our flow up to a certain stage: may it be elaboration (`elab`), synthesis (`synth`) or place-and-route (`pnr`). If you can wait long enough you may also launch the entire flow to produce a final optimized post-layout netlist:
+As the proprietary flow involves proprietary tools and technologies, the flow is contained in a separate private git repository. 
+If you are an IIS user, with access to our Gitlab server and IIS machines, sourcing the `iis-setup.sh` script clones the `snitch-cluster-nonfree` submodule in the non `nonfree` folder.
+
+There, you will find a Makefile defining a series of convenience targets to launch the proprietary flow up to a certain stage: may it be elaboration (`elab`), synthesis (`synth`) or place-and-route (`pnr`). If you can wait long enough you may also launch the entire flow to produce a final optimized post-layout netlist:
 
 ```shell
 make post-layout-netlist
@@ -378,59 +378,100 @@ make FIRST_STAGE=synth-init-opto post-layout-netlist
 
 You will find reports and output files produced by the flow in the `nonfree/gf12/fusion/runs/0/` folder, respectively in the `reports` and `out` subdirectories, separated into individual subdirectories for every stage in the flow. These are all you should need to derive area and timing numbers for your design.
 
+### Open source flow
+
+The sources for this flow are contained in the open source repo under `target/asic`.
+
+You can run the full synthesis flow using the following command:
+```shell
+make yosys
+```
+
+You will find reports and output files produced by the flow in `target/asic/yosys/`.
+
 ## Running a physical simulation
 
 Once your design is physically implemented, you want to also verify that it works as intended.
-Assuming you used the previous command to get a final optimized post-layout netlist, you can directly build a simulation model out of it. Head back to the main repository, in the root directory, and build the simulation model with the following flag:
+Assuming you used one of the previous commands to produce a netlist, you can directly build a simulation model out of it. The technology flag is used to specify which netlist we want to compile:
 
-```shell
-make clean-vsim
-make PL_SIM=1 vsim
-```
+=== "Nonfree flow"
+    ```shell
+    make clean-vsim
+    make TECH=gf12 vsim
+    ```
 
-This resembles the commands you've previously seen in section [Building the hardware](#building-the-hardware). In fact, all testbench components are the same, we simply use the added flag to tell [Bender](https://github.com/pulp-platform/bender) to reference the physical netlist in place of the source RTL as a DUT during compilation.
-The `Bender.yml` file automatically references the final netlist in our flow, but you could replace that with a netlist from an intermediate stage if you do not intend to run the whole flow.
+=== "Free flow"
+    ```shell
+    make clean-vsim
+    make TECH=ihp13 vsim
+    ```
+
+This resembles the commands you've previously seen in section [Building the hardware](#building-the-hardware). In fact, all testbench components are the same, we simply use the technology flag to tell [Bender](https://github.com/pulp-platform/bender) to reference the physical netlist in place of the source RTL as a DUT during compilation.
+The `Bender.yml` file automatically references the final, post-layout netlist in the nonfree flow, but you could replace that with a netlist from an intermediate stage if you do not intend to run the whole flow.
 
 !!! note
     Make does not track changes in the flags passed to it, so it does not know that it has to update the RTL source list for compilation. To ensure that it is updated, we can delete the compilation script, which was implicitly generated when you last built the simulation model. The first command above achieves this, by deleting all artifacts from the last build with QuestaSim.
 
 Running a physical simulation is then no different from running a functional simulation, so you may continue using the commands introduced in section [Running a simulation](#running-a-simulation).
 
+!!! warning
+    Physical simulations using Verilator have not been tested, as in our experiments Verilator takes an excessive amount of time and memory to build the simulation model.
+
 ## Power estimation
+
+!!! warning
+    The power estimation flow is currently only available for IIS users with access to the nonfree flow.
 
 During physical implementation, the tools are able to independently generate area and timing numbers. For a complete PPA analysis, you will want to include power estimates as well.
 
-Power numbers are extremely dependent on the switching activity in your circuit, which in turn depends on the stimuli you feed in to your DUT, so you are in charge of providing this information to the tools. The switching activity is typically recorded in the form of a [VCD](https://en.wikipedia.org/wiki/Value_change_dump) file, and can be generated by most RTL simulators.
+Power numbers are extremely dependent on the switching activity in your circuit, which in turn depends on the stimuli you feed in to your DUT, so you are in charge of providing this information to the tools. The switching activity can be recorded either as a [VCD](https://en.wikipedia.org/wiki/Value_change_dump) file or as a more compact [SAIF](https://en.wikipedia.org/wiki/Switching_Activity_Interchange_Format) (Switching Activity Interchange Format) — both carry the switching data PrimeTime needs. SAIF files are typically ~300× smaller than VCDs; pick VCD if you also want waveforms for debugging.
 
-To do so, set the `VCD_DUMP` flag when building the physical simulation model:
-```shell
-make PL_SIM=1 VCD_DUMP=1 DEBUG=ON vsim
-``` 
+To record switching activity during the simulation, set the corresponding flag when building the physical simulation model:
+
+=== "VCD"
+    ```shell
+    make TECH=gf12 VCD_DUMP=1 DEBUG=ON vsim
+    ```
+=== "SAIF"
+    ```shell
+    make TECH=gf12 SAIF_DUMP=1 DEBUG=ON vsim
+    ```
 
 !!! danger
-    When using QuestaSim for VCD generation, you must build the model with the `DEBUG=ON` flag, to ensure that all nets are preserved during compilation, preventing them from being optimized away. This guarantees that the VCD file contains switching activity for all nets in your circuit. 
+    When using QuestaSim for VCD or SAIF generation, you must build the model with the `DEBUG=ON` flag, to ensure that all nets are preserved during compilation, preventing them from being optimized away.
 
-When you run a simulation, the simulator will now automatically create a `vcd` subdirectory within the _simulation directory_, where a VCD file is generated.
+When you run a simulation, the simulator will automatically create a `vcd` or `saif` subdirectory within the _simulation directory_, where the recording is written.
 
-Most often you are not interested in estimating the power of an entire simulation, but only of a specific section, e.g. while executing a part of a kernel computation.
-You can pass start and end times (in ns) for VCD recording to the simulation as environment variables:
+Most often you are not interested in estimating the power of an entire simulation, but only of a specific section, e.g. while executing a part of a kernel computation. You can pass start and end times (in ns) for the recording to the simulation as environment variables:
 
-```shell
-VCD_START=127 VCD_END=8898 snitch_cluster.vsim sw/kernels/blas/axpy/build/axpy.elf
-```
+=== "VCD"
+    ```shell
+    VCD_START=127 VCD_END=8898 snitch_cluster.vsim sw/kernels/blas/axpy/build/axpy.elf
+    ```
+=== "SAIF"
+    ```shell
+    SAIF_START=127 SAIF_END=8898 snitch_cluster.vsim sw/kernels/blas/axpy/build/axpy.elf
+    ```
 
 !!! note
     Variable assignments must preceed the executable in a shell command to be interpreted as environment variable assignments. Note that environment variables set this way only persist for the current command.
 
 A benefit of RTL simulations is that they are cycle-accurate. You can thus use them as a reference to find the start and end times of interest with the help of the simulation traces (unavailable during physical simulation), and directly apply these to the physical simulation.
 
-With a VCD file at your disposal, you can now estimate the power consumption of your circuit. In the non-free repository, run the following command:
-```shell
-make SIM_DIR=<path_to_simulation_directory> power
-```
-You need to point the command to the _simulation directory_ in which the VCD dump was generated, for it to find the VCD file.
+With a recording at your disposal, you can now estimate the power consumption of your circuit:
+
+=== "VCD"
+    ```shell
+    make SIM_DIR=<path_to_simulation_directory> power
+    ```
+=== "SAIF"
+    ```shell
+    make SIM_DIR=<path_to_simulation_directory> power-saif
+    ```
+
+You need to point the command to the _simulation directory_ in which the recording was generated, for it to find the file.
 
 !!! note
     Since the actual simulation command is run in a different directory, you need to point to the _simulation directory_ using an absolute path.
 
-Once the command terminates, you will find power reports in the `nonfree/gf12/synopsys/reports` folder, from which you can extract relevant power numbers.
+Once the command terminates, you will find power reports in the `nonfree/gf12/synopsys/reports` folder, from which you can extract relevant power numbers. The nonfree repository's README covers additional options, including how to derive a SAIF from an existing VCD via Synopsys's `vcd2saif` utility.

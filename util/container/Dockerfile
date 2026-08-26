@@ -1,14 +1,18 @@
 # Copyright 2020 ETH Zurich and University of Bologna.
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
+#
+# Author: Luca Colagrande <colluca@iis.ee.ethz.ch>
+#
+# Docker containers for Snitch hardware and software development.
 
-# Docker container for Snitch development.
-
-ARG VERILATOR_VERSION=5.034
-ARG UBUNTU_VERSION=22.04
-ARG PYTHON_VERSION=3.11
+# Ubuntu version must be aligned with OSEDA version
+ARG OSEDA_VERSION=2026.02
+ARG UBUNTU_VERSION=24.04
 # Run dpkg without interactive dialogue
 ARG DEBIAN_FRONTEND=noninteractive
+ARG REPO_DIR=/repo
+ARG TOOL_DIR=/tools
 
 #-------------------------------------------------------------------------------
 # Stage 1: Tool builder
@@ -16,9 +20,9 @@ ARG DEBIAN_FRONTEND=noninteractive
 #------------------------------------------------------------------------------
 
 FROM ubuntu:${UBUNTU_VERSION} AS tool-builder
-ARG BENDER_VERSION=0.28.1
+ARG BENDER_VERSION=0.31.0
 ARG DOXYGEN_VERSION=1.12.0
-ARG SNITCH_LLVM_VERSION=15.0.0-snitch-0.2.0
+ARG SNITCH_LLVM_VERSION=22.1.7-pulp-0.1.0
 ARG UBUNTU_VERSION
 ARG DEBIAN_FRONTEND
 
@@ -41,19 +45,28 @@ RUN wget https://www.doxygen.nl/files/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.g
     mv doxygen-${DOXYGEN_VERSION} doxygen
 
 # Get the precompiled LLVM toolchain
-RUN wget https://github.com/pulp-platform/llvm-project/releases/download/${SNITCH_LLVM_VERSION}/riscv32-snitch-llvm-ubuntu2204-${SNITCH_LLVM_VERSION}.tar.gz && \
-    tar xvf riscv32-snitch-llvm-ubuntu2204-${SNITCH_LLVM_VERSION}.tar.gz && \
-    mv riscv32-snitch-llvm-ubuntu2204-${SNITCH_LLVM_VERSION} riscv-llvm 
+RUN wget https://github.com/pulp-platform/llvm-project/releases/download/${SNITCH_LLVM_VERSION}/riscv32-pulp-llvm-ubuntu2204-${SNITCH_LLVM_VERSION}.tar.gz && \
+    tar xvf riscv32-pulp-llvm-ubuntu2204-${SNITCH_LLVM_VERSION}.tar.gz && \
+    mv riscv32-pulp-llvm-ubuntu2204-${SNITCH_LLVM_VERSION} riscv-llvm
+
+# Install uv
+ENV UV_INSTALL_DIR=/tools
+ADD https://astral.sh/uv/install.sh /uv-installer.sh
+RUN sh /uv-installer.sh && rm /uv-installer.sh
 
 #-------------------------------------------------------------------------------
 # Stage 2: Hardware development stage
-# Builds on Verilator image and installs all tools required for both hardware
-# and software development.
+# Contains all tools required for both hardware and software development, copied
+# from Harald Pretl's open-source EDA container and the previous tool-builder
+# stage.
 #------------------------------------------------------------------------------
 
-FROM verilator/verilator:v${VERILATOR_VERSION} AS snitch_cluster-hw
-ARG PYTHON_VERSION
+FROM hpretl/iic-osic-tools:${OSEDA_VERSION} AS oseda
+
+FROM ubuntu:${UBUNTU_VERSION} AS snitch_cluster-hw
 ARG DEBIAN_FRONTEND
+ARG REPO_DIR
+ARG TOOL_DIR
 
 LABEL version="0.1"
 LABEL description="Snitch container for hardware and software development."
@@ -63,48 +76,62 @@ LABEL org.opencontainers.image.source=https://github.com/pulp-platform/snitch_cl
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # General requirements
-        curl wget build-essential git \
-        # Required for python
-        software-properties-common gnupg2 \
+        curl wget build-essential git ca-certificates \
+        # Required for Verilator
+        ccache mold binutils \
         # Required for fesvr
-        device-tree-compiler && \
-    # Install Python (both binaries and headers)
-    apt-add-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python${PYTHON_VERSION}-venv \
-        python${PYTHON_VERSION}-dev && \
+        device-tree-compiler \
+        # Shared libraries required by yosys (see https://github.com/iic-jku/IIC-OSIC-TOOLS/blob/main/_build/images/base-dev/scripts/install.sh)
+        libboost-filesystem-dev \
+        libboost-python-dev \
+        libexpat1-dev \
+        libffi-dev \
+        libreadline-dev \
+        libz-dev \
+        python3-dev \
+        tcl-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
-# Copy all needed files to install the package
-COPY . /repo
+# Copy tools from the builder stage
+COPY --from=tool-builder /tools/bender ${TOOL_DIR}/bin/
+COPY --from=tool-builder /tools/uv ${TOOL_DIR}/bin/
+COPY --from=tool-builder /tools/doxygen/bin/doxygen ${TOOL_DIR}/bin/
+COPY --from=tool-builder /tools/riscv-llvm ${TOOL_DIR}/riscv-llvm
 
-# Create and activate virtual environment
-ENV VIRTUAL_ENV="/root/.venvs/snitch_cluster"
-RUN python${PYTHON_VERSION} -m venv ${VIRTUAL_ENV}
+# Copy tools from OSEDA container
+COPY --from=oseda /foss/tools/verilator ${TOOL_DIR}/verilator
+COPY --from=oseda /foss/tools/yosys ${TOOL_DIR}/yosys
 
-# Copy the tools from the builder stage
-COPY --from=tool-builder /tools/bender /tools/bin/
-COPY --from=tool-builder /tools/doxygen/bin/doxygen /tools/bin/
-COPY --from=tool-builder /tools/riscv-llvm /tools/riscv-llvm
+# Create a simple bash prompt
+RUN echo "export PS1='\[\033[0;32m\]\w >\[\033[0;38m\] '" > ~/.bashrc
 
 # Modify environment and path variables
-ENV SN_VLT="verilator"
-ENV SN_LLVM_BINROOT="/tools/riscv-llvm/bin"
-ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
-ENV PATH="/tools/bin:${PATH}"
-ENV PATH="/tools/riscv-llvm/bin:${PATH}"
-ENV PATH="/repo/target/sim/build/bin:${PATH}"
+ENV SN_LLVM_BINROOT="${TOOL_DIR}/riscv-llvm/bin"
+ENV PATH="${REPO_DIR}/target/sim/build/bin:${PATH}"
+ENV PATH="${TOOL_DIR}/bin:${PATH}"
+ENV PATH="${TOOL_DIR}/verilator/bin:${PATH}"
+ENV PATH="${TOOL_DIR}/yosys/bin:${PATH}"
 
-# Upgrade pip and install packages using the virtual environment's pip
-# Don't cache pip files to avoid polluting the docker container
-# Install torch from the CPU-only index to avoid installing the GPU version.
-# Since we previously added the venv's bin/ directory to the path, pip here resolves to that.
-ARG PIP_NO_CACHE_DIR=1
-RUN pip install --upgrade pip && \
-    pip install torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install /repo[all]
+# Set up Python environment
+# Doing it here ensures that, even if someone (such as the Github CI) overwrites entrypoint.sh,
+# the environment variables will still be set up correctly.
+ENV UV_PROJECT_ENVIRONMENT="${REPO_DIR}/.venv"
+ENV PATH="${REPO_DIR}/.venv/bin:$PATH"
+# Persists the uv Python installation and cache across container runs, by storing them in the mounted volume.
+# Paths mimic the default ones derived from XDG_CACHE_HOME and XDG_DATA_HOME.
+ENV UV_CACHE_DIR="${REPO_DIR}/.cache/uv"
+ENV UV_PYTHON_INSTALL_DIR="${REPO_DIR}/.local/share/uv/python"
+
+# Define default working directory
+WORKDIR ${REPO_DIR}
+
+# Define default entrypoint and command
+# Launches a bash shell with the environment defined in `entrypoint.sh`
+COPY util/container/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bash"]
 
 #-------------------------------------------------------------------------------
 # Stage 3: Hardware build
@@ -112,61 +139,64 @@ RUN pip install --upgrade pip && \
 #------------------------------------------------------------------------------
 
 FROM snitch_cluster-hw AS hw-builder
+ARG REPO_DIR
 
-# Copy the snitch_cluster repository from the build context into /repo
-COPY . /repo
-# Build the verilator model
-RUN cd /repo && make verilator
+# Copy the snitch_cluster repository from the build context into ${REPO_DIR}
+COPY . ${REPO_DIR}
+WORKDIR ${REPO_DIR}
+
+# Build the verilator model (with simple FST tracing enabled, to meet CI memory constraints)
+RUN bender checkout
+RUN uv run make verilator DEBUG=ON CI=ON
 
 #-------------------------------------------------------------------------------
 # Stage 4: Software development stage
-# Copies the Verilated model and all (and only) tools required for software
-# development from the previous stages.
+# Contains all and only tools required for software development, including a
+# pre-built Verilator model of the default Snitch cluster, as built in the
+# previous hw-builder stage.
 #------------------------------------------------------------------------------
 
 FROM ubuntu:${UBUNTU_VERSION} AS snitch_cluster-sw
 ARG PYTHON_VERSION
 ARG DEBIAN_FRONTEND
+ARG REPO_DIR
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # General requirements
-        curl wget build-essential git \
-        # Required for python
-        software-properties-common gnupg2 && \
-    # Install Python (both binaries and headers)
-    apt-add-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python${PYTHON_VERSION}-venv \
-        python${PYTHON_VERSION}-dev && \
-    apt-get clean && \
+        curl wget build-essential git ca-certificates && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
-
-# Copy all needed files to install the package
-COPY . /repo
-
-# Create and activate virtual environment
-ENV VIRTUAL_ENV="/root/.venvs/snitch_cluster"
-RUN python${PYTHON_VERSION} -m venv ${VIRTUAL_ENV}
 
 # Copy the tools from the builder stages
 COPY --from=tool-builder /tools/bender /tools/bin/
+COPY --from=tool-builder /tools/uv /tools/bin/
 COPY --from=tool-builder /tools/doxygen/bin/doxygen /tools/bin/
 COPY --from=tool-builder /tools/riscv-llvm /tools/riscv-llvm
-COPY --from=hw-builder /repo/target/sim/build/bin/snitch_cluster_bin.vlt /tools/bin/snitch_cluster.vlt
+COPY --from=hw-builder ${REPO_DIR}/target/sim/build/bin/snitch_cluster_bin.vlt /tools/bin/snitch_cluster.vlt
+
+# Create a simple bash prompt
+RUN echo "export PS1='\[\033[0;32m\]\w >\[\033[0;38m\] '" > ~/.bashrc
 
 # Modify environment and path variables
 ENV SN_LLVM_BINROOT="/tools/riscv-llvm/bin"
-ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 ENV PATH="/tools/bin:${PATH}"
-ENV PATH="/tools/riscv-llvm/bin:${PATH}"
 
-# Upgrade pip and install packages using the virtual environment's pip
-# Don't cache pip files to avoid polluting the docker container
-# Install torch from the CPU-only index to avoid installing the GPU version
-# Since we previously added the venv's bin/ directory to the path, pip here resolves to that.
-ARG PIP_NO_CACHE_DIR=1
-RUN pip install --upgrade pip && \
-    pip install torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install /repo[all]
+# Set up Python environment
+# Doing it here ensures that, even if someone (such as the Github CI) overwrites entrypoint.sh,
+# the environment variables will still be set up correctly.
+ENV UV_PROJECT_ENVIRONMENT="${REPO_DIR}/.venv"
+ENV PATH="${REPO_DIR}/.venv/bin:$PATH"
+# Persists the uv Python installation and cache across container runs, by storing them in the mounted volume.
+# Paths mimic the default ones derived from XDG_CACHE_HOME and XDG_DATA_HOME.
+ENV UV_CACHE_DIR="${REPO_DIR}/.cache/uv"
+ENV UV_PYTHON_INSTALL_DIR="${REPO_DIR}/.local/share/uv/python"
+
+# Define default working directory
+WORKDIR ${REPO_DIR}
+
+# Define default entrypoint and command
+# Launches a bash shell with the environment defined in `entrypoint.sh`
+COPY util/container/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bash"]

@@ -11,8 +11,9 @@
 #######################
 
 DEBUG        ?= OFF  # ON to turn on debugging symbols and wave logging
+TRACE        ?= ON   # OFF to turn off trace logging
 CFG_OVERRIDE ?=      # Override default configuration file
-PL_SIM       ?= 0    # 1 for post-layout simulation
+TECH         ?=      # [gf12, ihp13] for physical simulation
 VCD_DUMP     ?= 0    # 1 to dump VCD traces
 
 # Non-namespaced aliases for common command-line variables
@@ -31,11 +32,14 @@ endif
 
 .PHONY: all clean
 all: rtl sw
-clean: clean-rtl clean-sw clean-work clean-logs clean-bender clean-misc
+clean: clean-rtl clean-sw clean-work clean-logs clean-bender clean-misc clean-toolchain
 
 ##########
 # Common #
 ##########
+
+SHELL       := /bin/bash
+.SHELLFLAGS := -euo pipefail -c
 
 SN_ROOT := $(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
@@ -123,6 +127,17 @@ $(GENERATED_DOCS_DIR)/peripherals.md: hw/snitch_cluster/src/snitch_cluster_perip
 $(DOXYGEN_DOCS_DIR): $(DOXYFILE) $(DOXYGEN_INPUTS)
 	doxygen $<
 
+#############
+# Toolchain #
+#############
+
+# Toolchain used by both RTL and SW stages
+include $(SN_ROOT)/make/toolchain.mk
+
+.PHONY: toolchain clean-toolchain
+toolchain: sn-toolchain
+clean-toolchain: sn-clean-toolchain
+
 #######
 # RTL #
 #######
@@ -137,24 +152,7 @@ clean-rtl: sn-clean-rtl
 # Non-free #
 ############
 
-NONFREE_REMOTE ?= git@iis-git.ee.ethz.ch:pulp-restricted/snitch-cluster-nonfree.git
-NONFREE_COMMIT ?= refactor
-NONFREE_DIR = $(SN_ROOT)/nonfree
-
-.PHONY: nonfree clean-nonfree
-
-nonfree:
-	cd $(NONFREE_DIR) && \
-	git init && \
-	git remote add origin $(NONFREE_REMOTE) && \
-	git fetch origin && \
-	git checkout $(NONFREE_COMMIT) -f
-
-clean-nonfree:
-	rm -rf $(NONFREE_DIR)
-	mkdir -p $(NONFREE_DIR)/util && touch $(NONFREE_DIR)/util/.gitignore
-
--include $(NONFREE_DIR)/Makefile
+-include nonfree/Makefile
 
 ############
 # Software #
@@ -213,6 +211,8 @@ SN_FESVR_VERSION ?= 35d50bc40e59ea1d5566fbd3d9226023821b1bb6
 $(SN_WORK_DIR)/$(SN_FESVR_VERSION)_unzip: | $(SN_WORK_DIR)
 	wget -O $(dir $@)/$(SN_FESVR_VERSION) https://github.com/riscv/riscv-isa-sim/tarball/$(SN_FESVR_VERSION)
 	tar xfm $(dir $@)$(SN_FESVR_VERSION) --strip-components=1 -C $(dir $@)
+	patch $(SN_WORK_DIR)/fesvr/context.h < $(SN_TARGET_DIR)/sim/patches/context.h.diff
+	patch $(SN_WORK_DIR)/fesvr/device.h < $(SN_TARGET_DIR)/sim/patches/device.h.diff
 	touch $@
 
 $(SN_WORK_DIR)/lib/libfesvr.a: $(SN_WORK_DIR)/$(SN_FESVR_VERSION)_unzip
@@ -221,9 +221,33 @@ $(SN_WORK_DIR)/lib/libfesvr.a: $(SN_WORK_DIR)/$(SN_FESVR_VERSION)_unzip
 	mkdir -p $(dir $@)
 	cp $(dir $<)libfesvr.a $@
 
-include $(SN_ROOT)/make/verilator.mk
 include $(SN_ROOT)/make/vsim.mk
+include $(SN_ROOT)/make/verilator.mk
 include $(SN_ROOT)/make/vcs.mk
+
+#############
+# Synthesis #
+#############
+
+include $(SN_ROOT)/target/asic/yosys/yosys.mk
+
+#################
+# Spyglass lint #
+#################
+
+LINT_DIR = $(SN_ROOT)/util/lint
+LINT_BUILD_DIR = $(LINT_DIR)/build
+
+.PHONY: spyglass
+
+$(LINT_BUILD_DIR):
+	mkdir -p $@
+
+$(LINT_BUILD_DIR)/analyze.tcl: $(SN_BENDER_LOCK) $(SN_BENDER_YML) $(SN_GEN_RTL_SRCS) | $(LINT_BUILD_DIR)
+	$(SN_BENDER) script flist-plus $(SN_COMMON_BENDER_ASIC_FLAGS) -t ihp13 > $@
+
+spyglass: $(LINT_DIR)/spyglass.tcl $(LINT_BUILD_DIR)/analyze.tcl | $(LINT_BUILD_DIR)
+	cd $(LINT_BUILD_DIR) && $(SN_SG_SHELL) -tcl $<
 
 #########
 # GVSOC #
@@ -246,6 +270,24 @@ clean-traces: sn-clean-traces
 clean-annotate: sn-clean-annotate
 clean-perf: sn-clean-perf
 clean-visual-trace: sn-clean-visual-trace
+
+############
+# IP tests #
+############
+
+IP_LIST  = mem_interface
+IP_LIST += tcdm_interface
+IP_LIST += snitch_ssr
+IP_LIST += snitch_cluster
+
+IP_TARGETS = $(addprefix test-,$(IP_LIST))
+
+.PHONY: test-ips
+
+test-ips: $(IP_TARGETS)
+
+$(IP_TARGETS): test-%:
+	cd hw/$* && ./util/compile.sh && ./util/run_vsim.sh
 
 ############################
 # Additional PHONY targets #

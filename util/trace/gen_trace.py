@@ -30,7 +30,7 @@ engine, and the DMA trace logged during simulation is fed to the tool.
 DMA performance metrics are dumped to a separate JSON file.
 """
 
-# TODO: OPER_TYPES and FPU_OPER_TYPES could break: optimization might alter enum mapping
+# TODO: FPU_OPER_TYPES could break: optimization might alter enum mapping
 # TODO: We annotate all FP16 LSU values as IEEE, not FP16ALT... can we do better?
 
 import sys
@@ -81,11 +81,7 @@ REG_ABI_NAMES_F = (*('ft{}'.format(i) for i in range(0, 8)), 'fs0', 'fs1',
                      for i in range(2, 12)), *('ft{}'.format(i)
                                                for i in range(8, 12)))
 
-TRACE_SRCES = {'snitch': 0, 'fpu': 1, 'sequencer': 2}
-
 LS_SIZES = ('Byte', 'Half', 'Word', 'Doub')
-
-OPER_TYPES = {'gpr': 1, 'csr': 8}
 
 FPU_OPER_TYPES = ('NONE', 'acc', 'rs1', 'rs2', 'rs3', 'rs1', 'rd')
 
@@ -267,6 +263,12 @@ CSR_NAMES = {
     0xf12: 'marchid',
     0xf13: 'mimpid',
     0xf14: 'mhartid',
+    0x7c0: 'ssr',
+    0x7c1: 'fpmode',
+    0x7c2: 'barrier',
+    0x7c3: 'sc',
+    0x7c4: 'user_low',
+    0x7c5: 'user_high',
     0xc80: 'cycleh',
     0xc81: 'timeh',
     0xc82: 'instreth',
@@ -334,6 +336,14 @@ CSR_NAMES = {
 
 PRIV_LVL = {'3': 'M', '1': 'S', '0': 'U'}
 
+
+# -------------------- Operand helpers  --------------------
+
+
+def operand_is_gpr(op_select):
+    return op_select in ['RegRs1', 'RegRs2', 'RegRs3', 'RegRd']
+
+
 # -------------------- FPU helpers  --------------------
 
 
@@ -355,7 +365,7 @@ def load_opcodes():
 
 
 @lru_cache
-def disasm_inst(hex_inst, mc_exec='llvm-mc', mc_flags='-disassemble -mcpu=snitch'):
+def disasm_inst(hex_inst, mc_exec='llvm-mc', mc_flags='-disassemble'):
     """Disassemble a single RISC-V instruction using llvm-mc."""
     # Reverse the endianness of the hex instruction
     inst_fmt = ' '.join(f'0x{byte:02x}' for byte in bytes.fromhex(hex_inst)[::-1])
@@ -503,18 +513,87 @@ def flt_fmt(flt: float, width: int = 6) -> str:
     return fmt.format(flt)
 
 
+# -------------------- DCA helpers  --------------------
+
+
+def fpu_operation(mnemonic, req_op_0, req_op_1, req_op_2, src_fmt_int, dst_fmt_int):
+    return {
+        "mnemonic": mnemonic,
+        "req_op_0": req_op_0,
+        "req_op_1": req_op_1,
+        "req_op_2": req_op_2,
+        "src_fmt_int": src_fmt_int,
+        "dst_fmt_int": dst_fmt_int
+    }
+
+
+FPU_OPS = [
+    fpu_operation("FMADD",    True,  True,  True,  False, False),
+    fpu_operation("FNMSUB",   True,  True,  True,  False, False),
+    fpu_operation("ADD",      False, True,  True,  False, False),
+    fpu_operation("MUL",      True,  True,  False, False, False),
+    fpu_operation("DIV",      True,  True,  False, False, False),
+    fpu_operation("SQRT",     True,  False, False, False, False),
+    fpu_operation("SGNJ",     True,  True,  False, False, False),
+    fpu_operation("MINMAX",   True,  True,  False, False, False),
+    fpu_operation("CMP",      True,  True,  False, False, False),
+    fpu_operation("CLASSIFY", True,  False, False, False, False),
+    fpu_operation("F2F",      True,  False, False, False, False),
+    fpu_operation("F2I",      True,  False, False, False, True),
+    fpu_operation("I2F",      True,  False, False, True,  False),
+    fpu_operation("CPKAB",    True,  True,  True,  False, False),
+    fpu_operation("CPKCD",    True,  True,  True,  False, False),
+    fpu_operation("SDOTP",    True,  True,  True,  False, False),
+    fpu_operation("EXVSUM",   True,  True,  True,  False, False),
+    fpu_operation("VSUM",     True,  True,  True,  False, False),
+]
+
+RND_MODE_MNEMONICS = ['RNE', 'RTZ', 'RDN', 'RUP', 'RMM', 'ROD', 'RSR', 'DYN']
+
+FP_VLEN = [
+    2,  # FP32
+    1,  # FP64
+    4,  # FP16
+    8,  # FP8
+    4,  # FP16A
+    8,  # FP8A
+]
+
+INT_VLEN = [
+    8,  # INT8
+    4,  # INT16
+    2,  # INT32
+    1,  # INT64
+]
+
+
 # -------------------- Literal formatting  --------------------
 
 
-def int_lit(num: int, size: int = 2, as_hex: Optional[bool] = None) -> str:
-    width = (8 * int(2**size))
-    size_mask = (0x1 << width) - 1
-    num = num & size_mask  # num is unsigned
-    num_signed = c_int32(c_uint32(num).value).value
-    if as_hex is True or abs(num_signed) > MAX_SIGNED_INT_LIT and as_hex is not False:
-        return '0x{0:0{1}x}'.format(num, width // 4)
+def int_lit(num: int, size: int = 2, vlen: int = 1, as_hex: Optional[bool] = None) -> str:
+    """Formats integer data.
+
+    Args:
+        num: The integer data to format.
+        size: log2 of the size in bytes of each number (in the vector).
+        vlen: The number of numbers packed in the encoding,
+              >1 for SIMD vectors.
+        as_hex: If True, always format as hex.
+    """
+    ints = []
+    bitwidth = (8 * int(2**size))
+    for i in reversed(range(vlen)):
+        slice = num >> (bitwidth * i) & (2**bitwidth - 1)
+        slice_signed = c_int32(c_uint32(slice).value).value
+        if as_hex is True or abs(slice_signed) > MAX_SIGNED_INT_LIT and as_hex is not False:
+            ints.append('0x{0:0{1}x}'.format(slice, bitwidth // 4))
+        else:
+            ints.append(str(slice_signed))
+    # Represent the encodings as a vector if SIMD.
+    if len(ints) > 1:
+        return '[{}]'.format(', '.join(ints))
     else:
-        return str(num_signed)
+        return ints[0]
 
 
 def flt_lit(num: int, fmt: int, width: int = 6, vlen: int = 1) -> str:
@@ -524,7 +603,7 @@ def flt_lit(num: int, fmt: int, width: int = 6, vlen: int = 1) -> str:
         num: The integer encoding of the floating-point number(s).
         fmt: The floating point number format, as an index into the
             `FLOAT_FMTS` array.
-        width: The bitwidth of the floating-point type.
+        width: The number of significant decimal digits to round to.
         vlen: The number of floating-point numbers packed in the encoding,
             >1 for SIMD vectors.
     """
@@ -538,6 +617,25 @@ def flt_lit(num: int, fmt: int, width: int = 6, vlen: int = 1) -> str:
         return '[{}]'.format(', '.join(floats))
     else:
         return floats[0]
+
+
+def fpu_operand_lit(num, fmt, is_vector, is_int) -> str:
+    """Formats an FPU operand's data.
+
+    Args:
+        num: The integer encoding of the floating-point number(s).
+        fmt: The floating point number format, as an index into the
+             `FLOAT_FMTS` array.
+        width: The bitwidth of the floating-point type.
+        vlen: The number of floating-point numbers packed in the encoding,
+            >1 for SIMD vectors.
+    """
+    if is_int:
+        vlen = INT_VLEN[fmt] if is_vector else 1
+        return int_lit(num, 3, vlen)
+    else:
+        vlen = FP_VLEN[fmt] if is_vector else 1
+        return flt_lit(num, fmt, 6, vlen)
 
 
 # -------------------- DMA --------------------
@@ -604,8 +702,26 @@ def eval_dma_metrics(dma_trans, dma_trace):
                 # to pre-compute from the core trace as it depends on address alignments, etc.)
                 if dma['backend']['req_valid'] and dma['backend']['req_ready']:
                     if req_bytes == 0:
+                        # Skip transactions which do not produce any burst on the
+                        # DMA backend, and hence do not appear in the DMA trace.
+                        # Zero-size transfers are rejected by the iDMA backend
+                        # (see the `reject_zero_tfs` backend parameter), and the
+                        # trailing placeholder transaction has no `size` set yet.
+                        while transfer_idx < len(dma_trans) and \
+                                dma_trans[transfer_idx].get('size', 0) == 0:
+                            transfer_idx += 1
+                        # Guard against more transfers appearing in the DMA trace
+                        # than were decoded from the core trace (e.g. if the core
+                        # trace was truncated). Stop evaluating DMA metrics rather
+                        # than crashing on the incomplete placeholder transaction.
+                        if transfer_idx >= len(dma_trans):
+                            print('Warning: DMA trace contains more transfers '
+                                  'than were decoded from the core trace; '
+                                  'stopping DMA metric evaluation.',
+                                  file=sys.stderr)
+                            break
                         exp_bytes = dma_trans[transfer_idx]['rep'] * \
-                                    dma_trans[transfer_idx]['size']
+                            dma_trans[transfer_idx]['size']
                         outst_transfers.append({'tstart': time,
                                                 'bytes': exp_bytes})
                     req_bytes += dma['backend']['req_length']
@@ -665,7 +781,7 @@ def eval_dma_metrics(dma_trans, dma_trace):
 def read_annotations(dict_str: str) -> dict:
     # return literal_eval(dict_str) 	# Could be used, but slow due to universality: needs compiler
     return {
-        key: int(val, 16)
+        key: int(val, 16) if val.startswith("0x") else val[1:-1]
         for key, val in re.findall(r"'([^']+)'\s*:\s*([^\s,]+)", dict_str)
     }
 
@@ -691,14 +807,14 @@ def annotate_snitch(extras: dict,
     # Regular linear datapath operation
     if not (extras['stall'] or extras['fpu_offload']):
         # Operand registers
-        if extras['opa_select'] == OPER_TYPES['gpr'] and extras['rs1'] != 0:
+        if operand_is_gpr(extras['opa_select']) and extras['rs1'] != 0:
             ret.append('{:<3} = {}'.format(REG_ABI_NAMES_I[extras['rs1']],
                                            int_lit(extras['opa'])))
-        if extras['opb_select'] == OPER_TYPES['gpr'] and extras['rs2'] != 0:
+        if operand_is_gpr(extras['opb_select']) and extras['rs2'] != 0:
             ret.append('{:<3} = {}'.format(REG_ABI_NAMES_I[extras['rs2']],
                                            int_lit(extras['opb'])))
         # CSR (always operand b)
-        if extras['opb_select'] == OPER_TYPES['csr']:
+        if extras['opb_select'] == 'Csr':
             csr_addr = extras['csr_addr']
             csr_name = CSR_NAMES[
                 csr_addr] if csr_addr in CSR_NAMES else 'csr@{:x}'.format(
@@ -809,9 +925,7 @@ def annotate_fpu(
         perf_metrics[-1]['fpss_fpu_issues'] += 1
     # Register writeback
     if extras['fpr_we']:
-        writer = 'acc' if extras['acc_q_hs'] and extras['acc_wb_ready'] else (
-            'fpu'
-            if extras['fpu_out_hs'] and not extras['fpu_out_acc'] else 'lsu')
+        writer = 'fpu' if extras['fpu_out_hs'] and not extras['fpu_out_acc'] else 'lsu'
         fmt = 0  # accelerator bus format is 0 for regular float32
         if writer == 'fpu' or writer == 'lsu':
             try:
@@ -834,6 +948,87 @@ def annotate_fpu(
     return ', '.join(ret)
 
 
+# Annotate DCA Instruction
+# Info: We receive the pure op-code / op-mode / vector-mode from the tracer
+#       rather than the 32-bit instruction.
+#       Documentation: https://github.com/openhwgroup/cvfpu/tree/master/docs
+def annotate_dca(
+        extras: dict,
+        insn: str,
+        cycle: int,
+        dca_wb_info: dict,  # One deque (FIFO) for storing information about the DCA access
+        perf_metrics: list,
+        force_hex_addr: bool = True,
+        permissive: bool = False):
+
+    inst = ''
+    annot = ''
+
+    # Retrieve operation information
+    rnd_mode_mnemonic = RND_MODE_MNEMONICS[extras['rnd_mode']]
+    opcode_mnemonic = FPU_OPS[extras['op']]['mnemonic']
+    req_op_0 = FPU_OPS[extras['op']]['req_op_0']
+    req_op_1 = FPU_OPS[extras['op']]['req_op_1']
+    req_op_2 = FPU_OPS[extras['op']]['req_op_2']
+    src_fmt_int = FPU_OPS[extras['op']]['src_fmt_int']
+    dst_fmt_int = FPU_OPS[extras['op']]['dst_fmt_int']
+    is_vector = extras['vectorial_op']
+    src_fp_fmt = extras['src_fmt']
+    dst_fp_fmt = extras['dst_fmt']
+    int_fmt = extras['int_fmt']
+
+    # Request handshake
+    if extras['req_hs'] == 1:
+
+        inst = f"DCA {opcode_mnemonic} (M:{extras['op_mod']} RND:{rnd_mode_mnemonic})"
+
+        # Uses operand 0
+        if req_op_0:
+            # Operand 0 is an integer if src_fmt_int is true
+            operand_lit = fpu_operand_lit(
+                extras['operand0'],
+                int_fmt if src_fmt_int else src_fp_fmt,
+                is_vector,
+                src_fmt_int
+            )
+            annot += 'op[0] = ' + operand_lit + ', '
+
+        # Uses operand 1
+        if req_op_1:
+            operand_lit = fpu_operand_lit(
+                extras['operand1'],
+                src_fp_fmt,
+                is_vector,
+                False
+            )
+            annot += 'op[1] = ' + operand_lit + ', '
+
+        # Uses operand 2
+        if req_op_2:
+            operand_lit = fpu_operand_lit(
+                extras['operand2'],
+                src_fp_fmt,
+                is_vector,
+                False
+            )
+            annot += 'op[2] = ' + operand_lit + ', '
+
+        # Update the performence metric
+        perf_metrics[-1]['dca_fpu_issues'] += 1
+
+        # Push dst format to the queue, if it is integer and if it is vector
+        fmt = int_fmt if dst_fmt_int else dst_fp_fmt
+        dca_wb_info[0].appendleft((dst_fmt_int, fmt, is_vector))
+
+    # On a response handshake pop format information from queue and annotate writeback
+    if extras['rsp_hs'] == 1:
+        is_int, fmt, is_vector = dca_wb_info[0].pop()
+        dst_lit = fpu_operand_lit(extras['result'], fmt, is_vector, is_int)
+        annot += '(d:dca) res = ' + dst_lit
+
+    return inst, annot
+
+
 # noinspection PyTypeChecker
 def annotate_insn(
     line: str,
@@ -841,6 +1036,8 @@ def annotate_insn(
     dict,  # One deque (FIFO) per GPR storing start cycles for each GPR WB
     fpr_wb_info:
     dict,  # One deque (FIFO) per FPR storing start cycles and formats for each FPR WB
+    dca_wb_info:
+    dict,  # One deque (FIFO) for storing information about the DCA access
     sequencer:
     Sequencer,  # Sequencer model to properly map tunneled instruction PCs
     perf_metrics: list,  # A list performance metric dicts
@@ -858,27 +1055,43 @@ def annotate_insn(
 ) -> (str, tuple, bool
       ):  # Return time info, whether trace line contains no info, and fseq_len
 
-    # Disassemble instruction
-    match = re.search(DASM_IN_REGEX, line)
-    if match is not None:
-        line = re.sub(
-            DASM_IN_REGEX,
-            disasm_inst(match.groups()[0], mc_exec, mc_flags),
-            line,
-        )
+    # Parse the raw line first to detect frontend stall before disassembly
     match = re.search(TRACE_IN_REGEX, line.strip('\n'))
     if match is None:
         raise ValueError('Not a valid trace line:\n{}'.format(line))
     time_str, cycle_str, priv_lvl, pc_str, insn, _, extras_str = match.groups()
+
+    # Pre-check stall: when the Snitch instruction frontend is stalled,
+    # inst_rsp_i.data (the DASM source) is not a valid instruction encoding.
+    frontend_stalled = False
+    extras = None
+    if extras_str:
+        extras = read_annotations(extras_str)
+        if extras.get('source') == 'SrcSnitch' and extras.get('stall'):
+            frontend_stalled = True
+
+    # Disassemble instruction only when the frontend holds a valid instruction
+    dasm_match = re.search(DASM_IN_REGEX, line)
+    if dasm_match is not None and not frontend_stalled:
+        line = re.sub(
+            DASM_IN_REGEX,
+            disasm_inst(dasm_match.groups()[0], mc_exec, mc_flags),
+            line,
+        )
+        # Re-parse after substitution to get the disassembled mnemonic
+        match = re.search(TRACE_IN_REGEX, line.strip('\n'))
+        time_str, cycle_str, priv_lvl, pc_str, insn, _, extras_str = match.groups()
+
     time_info = (int(time_str), int(cycle_str))
     show_time_info = (dupl_time_info or time_info != last_time_info)
     time_info_strs = tuple(
         (str(elem) if show_time_info else '') for elem in time_info)
     # Annotated trace
     if extras_str:
-        extras = read_annotations(extras_str)
+        if extras is None:
+            extras = read_annotations(extras_str)
         # Parse lines traced by Snitch
-        if extras['source'] == TRACE_SRCES['snitch']:
+        if extras['source'] == 'SrcSnitch':
             annot = annotate_snitch(extras, time_info[0], time_info[1],
                                     int(pc_str, 16), gpr_wb_info, perf_metrics,
                                     annot_fseq_offl, int_as_hex, permissive)
@@ -896,13 +1109,13 @@ def annotate_insn(
                 perf_metrics[-1]['snitch_issues'] += 1
             update_dma(insn, extras, dma_trans)
         # Parse lines traced by the sequencer
-        elif extras['source'] == TRACE_SRCES['sequencer']:
+        elif extras['source'] == 'SrcFpuSeq':
             # Sequencer only traces FREP configurations when the respective
             # FREP instruction is handshaked within the sequencer.
             assert (extras['cbuf_push']), 'Unexpected sequencer trace line'
             pc_str, insn, annot = sequencer.decode_frep(extras)
         # Parse lines traced by the FPSS
-        elif extras['source'] == TRACE_SRCES['fpu']:
+        elif extras['source'] == 'SrcFpu':
             annot_list = []
             # Parse lines corresponding to instruction issues
             if extras['acc_q_hs']:
@@ -925,6 +1138,11 @@ def annotate_insn(
                              sequencer.curr_sec, int_as_hex,
                              permissive))
             annot = ', '.join(annot_list)
+
+        # Annotate DCA
+        elif extras['source'] == 'SrcDca':
+            insn, annot = annotate_dca(extras, insn, time_info[1], dca_wb_info, perf_metrics)
+
         else:
             raise ValueError('Unknown trace source: {}'.format(
                 extras['source']))
@@ -1082,7 +1300,7 @@ def main():
     )
     parser.add_argument(
         '--mc-flags',
-        default='-disassemble -mcpu=snitch',
+        default='-disassemble',
         help='Flags to pass to the llvm-mc executable'
     )
 
@@ -1103,6 +1321,7 @@ def main():
         time_info = None
         gpr_wb_info = defaultdict(deque)
         fpr_wb_info = defaultdict(deque)
+        dca_wb_info = defaultdict(deque)
         sequencer = Sequencer()
         dma_trans = [{'rep': 1}]
         perf_metrics = [
@@ -1117,6 +1336,7 @@ def main():
                         line,
                         gpr_wb_info,
                         fpr_wb_info,
+                        dca_wb_info,
                         sequencer,
                         perf_metrics,
                         args.mc_exec,
@@ -1183,6 +1403,10 @@ def main():
         if len(que) != 0:
             warn_trip = True
             warnings.warn(wb_msg(REG_ABI_NAMES_I[gpr], que))
+    for dca, que in dca_wb_info.items():
+        if len(que) != 0:
+            warn_trip = True
+            warnings.warn(wb_msg("DCA", que))
     # Check final state of sequencer is clean
     if sequencer.terminate():
         warn_trip = True

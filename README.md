@@ -1,5 +1,6 @@
 ![CI](https://github.com/pulp-platform/snitch_cluster/actions/workflows/ci.yml/badge.svg)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: SHL-0.51](https://img.shields.io/badge/License-SHL--0.51-blue.svg)](https://solderpad.org/licenses/SHL-0.51/)
 
 # Snitch Cluster
 
@@ -13,8 +14,8 @@ To get started working with Snitch check out our [documentation pages](https://p
 
 What can you expect to find in this repository?
 
-- The RISC-V [Snitch integer core](https://pulp-platform.github.io/snitch_cluster/rm/snitch.html). This can be useful stand-alone if you are just interested in re-using the core for your project, e.g., as a tiny control core or you want to make a peripheral smart. The sky is the limit.
-- The [Snitch cluster](https://pulp-platform.github.io/snitch_cluster/rm/snitch_cluster.html). A highly configurable cluster containing one to many integer cores with optional floating-point capabilities as well as our custom ISA extensions `Xssr`, `Xfrep`, and `Xdma`.
+- The RISC-V [Snitch integer core](https://pulp-platform.github.io/snitch_cluster/rm/hw/snitch.html). This can be useful stand-alone if you are just interested in re-using the core for your project, e.g., as a tiny control core or you want to make a peripheral smart. The sky is the limit.
+- The [Snitch cluster](https://pulp-platform.github.io/snitch_cluster/rm/hw/snitch_cluster.html). A highly configurable cluster containing one to many integer cores with optional floating-point capabilities as well as our custom ISA extensions `Xssr`, `Xfrep`, and `Xdma`.
 - A runtime and example applications for the Snitch cluster.
 - RTL simulation environments for Verilator, Questa Advanced Simulator, and VCS, as well as configurations for the [GVSoC system simulator](https://github.com/gvsoc/gvsoc).
 
@@ -24,7 +25,7 @@ This code was previously hosted in the [Snitch monorepo](https://github.com/pulp
 
 Snitch is being made available under permissive open source licenses.
 
-The following files are released under Solderpad v0.51 (`SHL-0.51`) see `hw/LICENSE`:
+The following files are released under Solderpad v0.51 (`SHL-0.51`), see [`LICENSES/SHL-0.51.txt`](LICENSES/SHL-0.51.txt):
 
 - `hw/`
 
@@ -33,7 +34,7 @@ licenses. See the respective folder for the licenses used.
 
 - `sw/deps/`
 
-All other files are released under Apache License 2.0 (`Apache-2.0`) see `LICENSE`.
+All other files are released under Apache License 2.0 (`Apache-2.0`), see [`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt).
 
 ## Contributing
 

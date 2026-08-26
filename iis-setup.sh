@@ -6,22 +6,32 @@
 # Define environment variables
 export CC=gcc-9.2.0
 export CXX=g++-9.2.0
-export SN_BENDER=bender-0.28.1
+export SN_OSEDA="oseda -2026.02"
+export SN_BENDER=bender-0.31.0
 export SN_VCS_SEPP=vcs-2024.09
-export SN_VERILATOR_SEPP=oseda
+export SN_VERILATOR_SEPP=$SN_OSEDA
 export SN_QUESTA_SEPP=questa-2023.4
-export SN_LLVM_BINROOT=/usr/scratch2/vulcano/colluca/tools/riscv32-snitch-llvm-almalinux8-15.0.0-snitch-0.2.0/bin
+export SN_YOSYS="$SN_OSEDA yosys"
+export SN_LLVM_BINROOT=/usr/scratch2/vulcano/colluca/tools/riscv32-pulp-llvm-almalinux8-22.1.7-pulp-0.1.0/bin/
+export SN_SG_SHELL="spyglass-2024.09 sg_shell"
 
-# Create Python virtual environment with required packages
-/usr/local/anaconda3-2023.07/bin/python -m venv .venv
-source .venv/bin/activate
-# Install local packages in editable mode and unpack packages in a
-# local temporary directory which can be safely cleaned after installation.
-# Also protects against "No space left on device" errors
-# occurring when the /tmp folder is filled by other processes.
-mkdir tmp
-TMPDIR=tmp pip install -e .[all]
-rm -rf tmp
+# We need Make >4.3 for grouped targets
+export PATH=$PWD/util/bin:$PATH
 
 # Add simulator binaries to PATH
 export PATH=$PWD/target/sim/build/bin:$PATH
+
+# Initialize submodules
+git -c submodule.nonfree.update=checkout submodule update --init --recursive
+
+# Initialize Bender dependencies
+$SN_BENDER checkout
+
+# Bootstrap the Python environment
+# Prefix with flock to prevent race condition in managed Python installation,
+# see https://github.com/astral-sh/uv/issues/19329
+flock-2.41 --fcntl "${HOME}/uv-ci.lock" bash -euo pipefail -c '
+  uv sync --all-extras --all-groups --locked
+  uv pip install -e nonfree
+'
+source .venv/bin/activate

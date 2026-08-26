@@ -11,73 +11,104 @@ on: [push]
 env:
   FORCE_COLOR: 1
 
+# Cancel any in-progress runs on new push to the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+
+  #############
+  # Base SHA  #
+  #############
+
+  base-sha:
+    name: Determine base SHA
+    runs-on: ubuntu-22.04
+    outputs:
+      sha: ${{ steps.base-sha.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Determine base SHA
+        id: base-sha
+        # Compare against the merge-base with `main`, not just the previous
+        # commit on this branch: CI doesn't necessarily run on every push
+        # (e.g. superseded runs get cancelled), so a plain previous-commit
+        # diff could silently skip over a real prerequisite change.
+        #
+        # On forks, `origin` is the fork itself, whose `main` can lag behind
+        # the upstream repo it was forked from, so we always fetch
+        # `main` from the canonical upstream repo instead of `origin`.
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            sha="${{ github.event.before }}"
+          else
+            git fetch https://github.com/pulp-platform/snitch_cluster.git main
+            sha="$(git merge-base FETCH_HEAD HEAD)"
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Base SHA: $sha"
 
   ##########################
   # Build Docker Container #
   ##########################
 
-  build-docker:
-    name: Deploy Docker image
+  docker-meta:
+    name: Define Docker image names
     runs-on: ubuntu-22.04
-    # Export Docker image name used by dependent jobs
     outputs:
-      hw_image_name: ${{ steps.image_name.outputs.hw_image_name }}
-      sw_image_name: ${{ steps.image_name.outputs.sw_image_name }}
+      hw_image_name: ${{ steps.meta.outputs.hw_image_name }}
+      sw_image_name: ${{ steps.meta.outputs.sw_image_name }}
     steps:
-      - name: Define Docker image name
-        id: image_name
-        # To satisfy Docker tag naming requirements, we replace all slashes
-        # in the ref name with hyphens and convert the repository name to lowercase.
+      - id: meta
         run: |
           SANITIZED_REF_NAME="${GITHUB_REF_NAME//\//-}"
-          echo "Sanitized GITHUB_REF_NAME: $SANITIZED_REF_NAME"
           SANITIZED_REPO_NAME="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+
+          echo "Sanitized GITHUB_REF_NAME: $SANITIZED_REF_NAME"
           echo "Sanitized GITHUB_REPOSITORY: $SANITIZED_REPO_NAME"
+
           HW_IMAGE_NAME="ghcr.io/${SANITIZED_REPO_NAME}-hw:${SANITIZED_REF_NAME}"
           SW_IMAGE_NAME="ghcr.io/${SANITIZED_REPO_NAME}-sw:${SANITIZED_REF_NAME}"
-          echo "HW image name: $HW_IMAGE_NAME"
-          echo "SW image name: $SW_IMAGE_NAME"
+
           {
             echo "hw_image_name=$HW_IMAGE_NAME"
             echo "sw_image_name=$SW_IMAGE_NAME"
-          } >> $GITHUB_OUTPUT
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          docker-images: false
+          } >> "$GITHUB_OUTPUT"
+
+  build-hw-image:
+    name: Deploy hardware development image
+    runs-on: ubuntu-22.04
+    needs: [docker-meta]
+    outputs:
+      hw_image_name: ${{ needs.docker-meta.outputs.hw_image_name }}
+    steps:
       - uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
-      - uses: docker/setup-buildx-action@v3
-      - name: GHCR Log-in
-        uses: docker/login-action@v3
+          submodules: recursive
+      - uses: ./.github/actions/docker-build-push
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      # Build and push hardware container
-      - name: Build and push (hw container)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: util/container/Dockerfile
           target: snitch_cluster-hw
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          push: true
-          tags: ${{ steps.image_name.outputs.hw_image_name }}
-      # Build and push software container
-      - name: Build and push (sw container)
-        uses: docker/build-push-action@v6
+          tags: ${{ needs.docker-meta.outputs.hw_image_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  build-sw-image:
+    name: Deploy software development image
+    runs-on: ubuntu-22.04
+    needs: [docker-meta]
+    outputs:
+      sw_image_name: ${{ needs.docker-meta.outputs.sw_image_name }}
+    steps:
+      - uses: actions/checkout@v4
         with:
-          context: .
-          file: util/container/Dockerfile
+          submodules: recursive
+      - uses: ./.github/actions/docker-build-push
+        with:
           target: snitch_cluster-sw
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          push: true
-          tags: ${{ steps.image_name.outputs.sw_image_name }}
+          tags: ${{ needs.docker-meta.outputs.sw_image_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   ########
   # Docs #
@@ -86,27 +117,29 @@ jobs:
   build-docs:
     name: Build documentation
     runs-on: ubuntu-22.04
-    needs: build-docker
+    needs: [docker-meta, build-sw-image]
     container:
-      image: ${{ needs.build-docker.outputs.hw_image_name }}
+      image: ${{ needs.docker-meta.outputs.sw_image_name }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+      - uses: ./.github/actions/setup-container
       - name: Build docs
         run: make docs
 
   deploy-docs:
     name: Deploy documentation
     runs-on: ubuntu-22.04
-    needs: build-docker
+    needs: [docker-meta, build-sw-image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     container:
-      image: ${{ needs.build-docker.outputs.hw_image_name }}
+      image: ${{ needs.docker-meta.outputs.sw_image_name }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+      - uses: ./.github/actions/setup-container
       # For some reason, the checkout is done by a different user
       # than that deploying to Github (root, possibly due to Docker).
       # So we need to set the repository as a safe directory.
@@ -127,11 +160,14 @@ jobs:
   pytest:
     name: Python unit tests
     runs-on: ubuntu-22.04
-    needs: build-docker
+    needs: [docker-meta, build-sw-image]
     container:
-      image: ${{ needs.build-docker.outputs.hw_image_name }}
+      image: ${{ needs.docker-meta.outputs.sw_image_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - uses: ./.github/actions/setup-container
       - name: Run pytest
         run: pytest
 
@@ -142,16 +178,17 @@ jobs:
   snitch-cluster-vlt:
     name: Build Snitch Cluster w/ Verilator
     runs-on: ubuntu-22.04
-    needs: build-docker
+    needs: [docker-meta, build-hw-image]
     container:
-      image: ${{ needs.build-docker.outputs.hw_image_name }}
+      image: ${{ needs.docker-meta.outputs.hw_image_name }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+      - uses: ./.github/actions/setup-container
       - name: Hash Verilator prerequisites
-        id: verilator-hash
-        uses: colluca/pymakeutils@v1.2.0
+        id: list-make-prerequisites
+        uses: colluca/list-make-prerequisites@v1.0.0
         with:
           target: verilator
           flags: --recursive
@@ -160,24 +197,25 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target/sim/build/bin
-          key: verilator-${{ steps.verilator-hash.outputs.hash }}
+          key: verilator-${{ steps.list-make-prerequisites.outputs.hash }}
           restore-keys: |
             verilator-
       - name: Build Hardware
         if: steps.verilator-cache.outputs.cache-hit != 'true'
         run: |
-          make CFG_OVERRIDE=cfg/github-ci.json VLT_JOBS=1 verilator
+          make CFG_OVERRIDE=cfg/github-ci.json verilator
 
   sw-snitch-cluster-vlt:
     name: Simulate SW on Snitch Cluster w/ Verilator
     runs-on: ubuntu-22.04
-    needs: build-docker
+    needs: [docker-meta, build-sw-image]
     container:
-      image: ${{ needs.build-docker.outputs.sw_image_name }}
+      image: ${{ needs.docker-meta.outputs.sw_image_name }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+      - uses: ./.github/actions/setup-container
       - name: Build Software
         run: |
           make sw -j
@@ -193,6 +231,148 @@ jobs:
         run: |
           make SIM_DIR=./test/runs/simple DEBUG=ON annotate -j
 
+  ########################################################
+  # Simulate SW on Snitch Cluster (Mempool) w/ Verilator #
+  ########################################################
+
+  snitch-mempool-cluster-vlt:
+    name: Build and Simulate Mempool Snitch Cluster w/ Verilator
+    runs-on: ubuntu-22.04
+    needs: [docker-meta, build-hw-image]
+    container:
+      image: ${{ needs.docker-meta.outputs.hw_image_name }}
+      volumes:
+        - ${{ github.workspace }}:/repo
+    defaults:
+      run:
+        working-directory: /repo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - uses: ./.github/actions/setup-container
+      - name: Hash Verilator prerequisites
+        id: list-make-prerequisites
+        uses: colluca/list-make-prerequisites@v1.0.0
+        with:
+          target: verilator
+          flags: --recursive
+      - name: Set up cache for Verilator build
+        id: verilator-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /repo/target/sim/build/bin
+          key: verilator-mempool-${{ steps.list-make-prerequisites.outputs.hash }}
+          restore-keys: |
+            verilator-mempool-
+      - name: Build Hardware
+        if: steps.verilator-cache.outputs.cache-hit != 'true'
+        run: |
+          make CFG_OVERRIDE=cfg/mempool.json verilator
+      - name: Build Software for mempool tests
+        run: |
+          make sw CFG_OVERRIDE=cfg/mempool.json -j
+      - name: Run Tests
+        run: |
+          cd test
+          ../util/experiments/run.py mempool.yaml --simulator verilator -j
+      - name: Annotate traces
+        # Build the traces using the --permissive flag, since the Verilator
+        # testbench does not wait until all the instructions are retired
+        # (compiler introduces few instructions after exit routine).
+        run: |
+          make SIM_DIR=./test/runs/simple DEBUG=ON annotate -j
+
+  ######################################################
+  # Simulate SW on Snitch Cluster (Spatz) w/ Verilator #
+  ######################################################
+
+  snitch-spatz-cluster-vlt:
+    name: Build and Simulate Spatz Snitch Cluster w/ Verilator
+    runs-on: ubuntu-22.04
+    needs: [docker-meta, build-hw-image]
+    container:
+      image: ${{ needs.docker-meta.outputs.hw_image_name }}
+      volumes:
+        - ${{ github.workspace }}:/repo
+    defaults:
+      run:
+        working-directory: /repo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - uses: ./.github/actions/setup-container
+      - name: Hash Verilator prerequisites
+        id: list-make-prerequisites
+        uses: colluca/list-make-prerequisites@v1.0.0
+        with:
+          target: verilator
+          flags: --recursive
+      - name: Set up cache for Verilator build
+        id: verilator-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /repo/target/sim/build/bin
+          key: verilator-spatz-${{ steps.list-make-prerequisites.outputs.hash }}
+          restore-keys: |
+            verilator-spatz-
+      - name: Build Hardware
+        if: steps.verilator-cache.outputs.cache-hit != 'true'
+        run: |
+          make CFG_OVERRIDE=cfg/spatz.json verilator
+      - name: Build Software
+        run: |
+          make CFG_OVERRIDE=cfg/spatz.json sw -j
+      - name: Run Tests
+        run: |
+          cd test
+          ../util/experiments/run.py spatz.yaml --simulator verilator -j
+
+  #############
+  # Synthesis #
+  #############
+
+  synthesis:
+    name: Synthesis w/ Yosys
+    runs-on: ubuntu-22.04
+    needs: [docker-meta, build-hw-image, base-sha]
+    container:
+      image: ${{ needs.docker-meta.outputs.hw_image_name }}
+      volumes:
+        - ${{ github.workspace }}:/repo
+    defaults:
+      run:
+        working-directory: /repo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-container
+      - name: Check if Yosys prerequisites changed
+        id: make-prerequisites-changed
+        uses: colluca/make-prerequisites-changed@v1.2.0
+        with:
+          target: yosys
+          flags: --recursive
+          base_sha: ${{ needs.base-sha.outputs.sha }}
+      - name: Run Synthesis
+        if: steps.make-prerequisites-changed.outputs.changed == 'true'
+        run: |
+          make CFG_OVERRIDE=cfg/yosys-ci.json yosys
+      - name: Upload Yosys logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yosys-synthesis-logs
+          path: |
+            target/asic/yosys/*.log
+            target/asic/yosys/reports/
+          if-no-files-found: warn
+
   ######################
   # Sources Up-to-Date #
   ######################
@@ -200,25 +380,25 @@ jobs:
   sources-up-to-date:
     name: Check Sources Up-to-Date
     runs-on: ubuntu-22.04
-    needs: build-docker
+    needs: [docker-meta, build-hw-image]
     container:
-      image: ${{ needs.build-docker.outputs.hw_image_name }}
+      image: ${{ needs.docker-meta.outputs.hw_image_name }}
+      volumes:
+        - ${{ github.workspace }}:/repo
+    defaults:
+      run:
+        working-directory: /repo
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: 'recursive'
+      - uses: ./.github/actions/setup-container
       - name: Generate opcodes
         run: |
           ./util/clustergen/generate-opcodes.sh
       - name: Generate RTL sources
         run: |
           make rtl
-      # For some reason, the checkout is done by a different user,
-      # than that running `git diff` (root, possibly due to Docker).
-      # So we need to set the repository as a safe directory.
-      - name: Git config safe.directory
-        run: |
-          git config --global --add safe.directory $GITHUB_WORKSPACE
       - name: Diff porcelain
         uses: mmontes11/diff-porcelain@v0.0.1
         with:

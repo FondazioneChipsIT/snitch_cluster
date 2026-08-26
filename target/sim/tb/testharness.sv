@@ -9,7 +9,7 @@ module testharness #(
   parameter realtime ClkPeriod = 1ns
 );
 
-  import snitch_cluster_pkg::*;
+  import snitch_cluster_wrapper_pkg::*;
 
   logic clk;
   logic rst_n;
@@ -22,7 +22,7 @@ module testharness #(
   wide_out_resp_t wide_out_resp;
   wide_in_req_t wide_in_req;
   wide_in_resp_t wide_in_resp;
-  logic [snitch_cluster_pkg::NrCores-1:0] msip, meip, mtip, mxip;
+  logic [NrCores-1:0] msip, meip, mtip, mxip;
 
   snitch_cluster_wrapper i_snitch_cluster (
     .clk_i (clk),
@@ -34,11 +34,16 @@ module testharness #(
     .mxip_i (mxip),
     .hart_base_id_i (CfgBaseHartId),
     .cluster_base_addr_i (CfgClusterBaseAddr),
+    .cluster_base_offset_i (CfgClusterBaseOffset),
     .clk_d2_bypass_i (1'b0),
 `ifdef TARGET_POSTLAYOUT
-    .sram_cfgs_i (snitch_cluster_pkg::sram_cfgs_t'('1)),
+    .sram_cfg_tcdm_i(sram_cfg_t'('1)),
+    .sram_cfg_icache_tag_i(sram_cfg_t'('1)),
+    .sram_cfg_icache_data_i(sram_cfg_t'('1)),
 `else
-    .sram_cfgs_i (snitch_cluster_pkg::sram_cfgs_t'('0)),
+    .sram_cfg_tcdm_i(sram_cfg_t'('0)),
+    .sram_cfg_icache_tag_i(sram_cfg_t'('0)),
+    .sram_cfg_icache_data_i(sram_cfg_t'('0)),
 `endif
     .narrow_in_req_i (narrow_in_req),
     .narrow_in_resp_o (narrow_in_resp),
@@ -48,10 +53,24 @@ module testharness #(
     .wide_out_resp_i (wide_out_resp),
     .wide_in_req_i (wide_in_req),
     .wide_in_resp_o (wide_in_resp),
+    .x_issue_resp_i ('0),
+    .x_issue_ready_i ('0),
+    .x_register_o (),
+    .x_register_valid_o (),
+    .x_register_ready_i ('0),
+    .x_commit_o (),
+    .x_commit_valid_o (),
+    .x_result_i ('0),
+    .x_result_valid_i ('0),
+    .x_issue_req_o (),
+    .x_issue_valid_o (),
+    .x_result_ready_o (),
     .narrow_ext_req_o (),
     .narrow_ext_resp_i ('0),
     .tcdm_ext_req_i ('0),
-    .tcdm_ext_resp_o ()
+    .tcdm_ext_resp_o (),
+    .dca_req_i ('0),
+    .dca_rsp_o ()
   );
 
   ///////////

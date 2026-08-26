@@ -11,6 +11,7 @@ name = "snitch"
 authors = [
     {name = "Luca Colagrande", email = "colluca@iis.ee.ethz.ch"}
 ]
+requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
     # Alphabetically sorted.
@@ -26,19 +27,23 @@ dependencies = [
     "pandas",
     "peakrdl",
     "peakrdl-markdown",
-    "peakrdl-rawheader@git+https://github.com/colluca/PeakRDL-rawheader.git@7b8dbc9ad5854dc1cdaf36d4ea024c29ffb00a4c",
+    "peakrdl-rawheader>=0.1.1",
     "prettytable",
     "progressbar2",
     "psutil",
     "pyelftools",
     "pyflexfloat",
-    "pymakeutils",
+    "pymakeutils>=1.4.0",
+    "pysynthutils",
     "pytablewriter",
     "pytest",
     "pyyaml",
+    "reuse",
+    "riscv-opcodes",
+    "spatz-vpu @ git+https://github.com/pulp-platform/spatz_vpu.git@0411cc6278d65bf46ca700ec5cde84cd681ce082",
     "tabulate",
     "termcolor",
-    "yamllint"
+    "yamllint",
 ]
 
 [project.optional-dependencies]
@@ -61,8 +66,26 @@ all = [
     "snitch[kernels,docs]"
 ]
 
+[dependency-groups]
+dev = [
+    "tsunami-wave @ git+https://github.com/zarubaf/tsunami.git@4a2d5c02462875fcebaef6f4e84563eb28b99cf8",
+]
+
+[tool.uv.sources]
+riscv-opcodes = { path = "sw/deps/riscv-opcodes", editable = true }
+torch = [
+    { index = "pytorch-cpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [tool.setuptools.package-dir]
 "snitch.dnn" = "sw/kernels/dnn"
 "snitch.blas" = "sw/kernels/blas"
 "snitch.util" = "util"
-"snitch.nonfree" = "nonfree/util"
+
+[tool.pytest.ini_options]
+testpaths = ["util/bench/tests"]

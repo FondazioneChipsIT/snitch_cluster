@@ -10,12 +10,13 @@
 #define LENGTH 64
 
 int main() {
+#ifdef SNRT_SUPPORTS_COPIFT
     // Only compute cores proceed
     if (snrt_is_dm_core()) return 0;
 
     // Allocate input and output arrays
     uint64_t *input = (uint64_t *)snrt_l1_alloc_compute_core_local(
-        LENGTH * sizeof(uint32_t), sizeof(uint32_t));
+        LENGTH * sizeof(uint64_t), sizeof(uint64_t));
     double *golden_output = (double *)snrt_l1_alloc_compute_core_local(
         LENGTH * sizeof(double), sizeof(double));
     double *actual_output = (double *)snrt_l1_alloc_compute_core_local(
@@ -58,4 +59,5 @@ int main() {
         if (golden_output[i] == actual_output[i]) n_errors--;
     }
     return n_errors;
+#endif
 }

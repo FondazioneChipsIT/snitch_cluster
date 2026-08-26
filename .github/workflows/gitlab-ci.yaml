@@ -7,6 +7,12 @@ name: gitlab-ci
 # Skip on pull requests as forks don't have required secrets,
 # and pull requests from own repo already trigger a push event.
 on: [push, workflow_dispatch]
+
+# Cancel any in-progress runs on new push to the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gitlab-ci:
     name: Internal Gitlab CI
@@ -16,7 +22,7 @@ jobs:
       github.repository == 'pulp-platform/snitch_cluster'
     steps:
       - name: Check Gitlab CI
-        uses: pulp-platform/pulp-actions/gitlab-ci@v2.4.3
+        uses: pulp-platform/pulp-actions/gitlab-ci@v2.5.1
         with:
           domain: iis-git.ee.ethz.ch
           repo: github-mirror/snitch_cluster
